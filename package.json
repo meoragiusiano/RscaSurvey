@@ -1,0 +1,19 @@
+{
+  "name": "rscasurvey",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "npm run -w react-frontend dev",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "workspaces": [
+    "packages/*"
+  ],
+  "dependencies": {
+    "nodemon": "^3.1.7"
+  }
+}

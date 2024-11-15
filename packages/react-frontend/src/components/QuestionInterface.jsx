@@ -1,64 +1,49 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Play, ChevronRight } from 'lucide-react';
+import axios from 'axios';
+
+const API_URL = 'http://localhost:8000/api';
 
 const QuestionInterface = () => {
-  const [currentState, setCurrentState] = useState('ready'); // ready, answering, completed
+  const [currentState, setCurrentState] = useState('ready');
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState({});
   const [questionStartTime, setQuestionStartTime] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [sessionId, setSessionId] = useState(null);
+  const [error, setError] = useState(null);
   
-  const QUESTION_TIME_LIMIT = 60000; // 60 seconds in milliseconds
-  
-  const questions = [
-    { 
-      id: 1, 
-      text: "What is 15 + 27?", 
-      type: "number"
-    },
-    { 
-      id: 2, 
-      text: "Name three European capitals.", 
-      type: "text"
-    },
-    {
-      id: 3,
-      text: "The earth is round.",
-      type: "likert",
-      options: [
-        "Strongly Disagree",
-        "Disagree",
-        "Neutral",
-        "Agree",
-        "Strongly Agree"
-      ]
-    },
-    {
-      id: 4,
-      text: "Which of these is a primary color?",
-      type: "multiple-choice",
-      options: [
-        "Green",
-        "Red",
-        "Purple",
-        "Orange"
-      ],
-      correctAnswer: "Red"
-    },
-    { 
-      id: 5, 
-      text: "What color is formed by mixing blue and yellow?", 
-      type: "text"
-    }
-  ];
+  const QUESTION_TIME_LIMIT = 60000;
 
-  const moveToNextQuestion = useCallback(() => {
+  // Fetch questions on component mount
+  useEffect(() => {
+    const fetchQuestions = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/questions`);
+        setQuestions(response.data);
+      } catch (err) {
+        setError('Failed to load questions. Please try again later.');
+        console.error('Error fetching questions:', err);
+      }
+    };
+
+    fetchQuestions();
+  }, []);
+
+  const moveToNextQuestion = useCallback(async () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
       setQuestionStartTime(Date.now());
     } else {
-      setCurrentState('completed');
+      try {
+        await axios.post(`${API_URL}/sessions/${sessionId}/complete`);
+        setCurrentState('completed');
+      } catch (err) {
+        setError('Failed to complete session. Please try again.');
+        console.error('Error completing session:', err);
+      }
     }
-  }, [currentQuestionIndex, questions.length]);
+  }, [currentQuestionIndex, questions.length, sessionId]);
 
   useEffect(() => {
     let timeoutId;
@@ -75,25 +60,44 @@ const QuestionInterface = () => {
         clearTimeout(timeoutId);
       }
     };
-  }, [currentState, currentQuestionIndex, moveToNextQuestion]);
+  }, [currentState, moveToNextQuestion]);
 
-  const startQuestionnaire = () => {
-    setCurrentState('answering');
-    setQuestionStartTime(Date.now());
+  const startQuestionnaire = async () => {
+    try {
+      const response = await axios.post(`${API_URL}/sessions`);
+      setSessionId(response.data.sessionId);
+      setCurrentState('answering');
+      setQuestionStartTime(Date.now());
+    } catch (err) {
+      setError('Failed to start session. Please try again.');
+      console.error('Error starting session:', err);
+    }
   };
 
-  const handleAnswer = (answer) => {
+  const handleAnswer = async (answer) => {
     const currentTime = Date.now();
     const timeSpent = currentTime - questionStartTime;
     
     if (timeSpent <= QUESTION_TIME_LIMIT) {
-      setAnswers(prev => ({
-        ...prev,
-        [questions[currentQuestionIndex].id]: {
+      try {
+        const currentQuestion = questions[currentQuestionIndex];
+        await axios.post(`${API_URL}/sessions/${sessionId}/answers`, {
+          questionId: currentQuestion.id,
           answer,
           timeSpent
-        }
-      }));
+        });
+
+        setAnswers(prev => ({
+          ...prev,
+          [currentQuestion.id]: {
+            answer,
+            timeSpent
+          }
+        }));
+      } catch (err) {
+        setError('Failed to save answer. Please try again.');
+        console.error('Error saving answer:', err);
+      }
     }
   };
 
@@ -111,6 +115,8 @@ const QuestionInterface = () => {
     setCurrentQuestionIndex(0);
     setAnswers({});
     setQuestionStartTime(null);
+    setSessionId(null);
+    setError(null);
   };
 
   const renderQuestionInput = () => {
@@ -173,11 +179,27 @@ const QuestionInterface = () => {
     }
   };
 
+  if (error) {
+    return (
+      <div className="w-full max-w-2xl mx-auto p-4">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+          <p>{error}</p>
+          <button 
+            onClick={resetQuestionnaire}
+            className="mt-4 bg-red-100 text-red-700 px-4 py-2 rounded-md hover:bg-red-200"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="w-full max-w-2xl mx-auto p-4">
       <div className="bg-white shadow-lg rounded-lg overflow-hidden">
         <div className="p-6">
-          <h2 className="text-2xl font-bold mb-4">Brain Response Study</h2>
+          <h2 className="text-2xl font-bold mb-4">Belonging Beyond Boundaries Study</h2>
 
           {currentState === 'ready' && (
             <div className="text-center py-8 space-y-4">
@@ -195,7 +217,7 @@ const QuestionInterface = () => {
             </div>
           )}
 
-          {currentState === 'answering' && (
+          {currentState === 'answering' && questions.length > 0 && (
             <div className="space-y-6">
               <div className="flex justify-between text-sm text-gray-500">
                 <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
