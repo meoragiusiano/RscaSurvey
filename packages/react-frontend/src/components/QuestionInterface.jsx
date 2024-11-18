@@ -31,43 +31,56 @@ const QuestionInterface = () => {
   }, []);
 
   const moveToNextQuestion = useCallback(async () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
-      setQuestionStartTime(Date.now());
-    } else {
-      try {
+    const currentQuestion = questions[currentQuestionIndex];
+  
+    try {
+      // Stop EEG recording for the current question
+      await stopEEGRecording(sessionId, currentQuestion.id);
+  
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(prev => prev + 1);
+        setQuestionStartTime(Date.now());
+  
+        // Start EEG recording for the next question
+        await startEEGRecording(sessionId, questions[currentQuestionIndex + 1].id);
+      } else {
+        // Complete the session when there are no more questions
         await axios.post(`${API_URL}/sessions/${sessionId}/complete`);
         setCurrentState('completed');
-      } catch (err) {
-        setError('Failed to complete session. Please try again.');
-        console.error('Error completing session:', err);
       }
+    } catch (err) {
+      setError('Failed to move to the next question or complete session. Please try again.');
+      console.error('Error moving to the next question:', err);
     }
-  }, [currentQuestionIndex, questions.length, sessionId]);
+  }, [currentQuestionIndex, questions, sessionId]);
+  
 
   useEffect(() => {
     let timeoutId;
-    
+  
     if (currentState === 'answering') {
       timeoutId = setTimeout(() => {
         console.log('Time limit reached, moving to next question');
         moveToNextQuestion();
       }, QUESTION_TIME_LIMIT);
     }
-
+  
     return () => {
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
     };
   }, [currentState, moveToNextQuestion]);
-
+  
   const startQuestionnaire = async () => {
     try {
       const response = await axios.post(`${API_URL}/sessions`);
       setSessionId(response.data.sessionId);
       setCurrentState('answering');
       setQuestionStartTime(Date.now());
+
+      // Start EEG recording for the first question
+      await startEEGRecording(response.data.sessionId, questions[0].id);
     } catch (err) {
       setError('Failed to start session. Please try again.');
       console.error('Error starting session:', err);
@@ -104,7 +117,7 @@ const QuestionInterface = () => {
   const handleNextClick = () => {
     const currentTime = Date.now();
     const timeSpent = currentTime - questionStartTime;
-    
+
     if (timeSpent <= QUESTION_TIME_LIMIT) {
       moveToNextQuestion();
     }
@@ -117,6 +130,26 @@ const QuestionInterface = () => {
     setQuestionStartTime(null);
     setSessionId(null);
     setError(null);
+  };
+
+  const startEEGRecording = async (sessionId, questionId) => {
+    try {
+      await axios.post(`${API_URL}/sessions/${sessionId}/questions/${questionId}/start-eeg`);
+      console.log(`EEG recording started for question ${questionId}`);
+    } catch (err) {
+      setError('Failed to start EEG recording.');
+      console.error('Error starting EEG recording:', err);
+    }
+  };
+
+  const stopEEGRecording = async (sessionId, questionId) => {
+    try {
+      await axios.post(`${API_URL}/sessions/${sessionId}/questions/${questionId}/stop-eeg`);
+      console.log(`EEG recording stopped for question ${questionId}`);
+    } catch (err) {
+      setError('Failed to stop EEG recording.');
+      console.error('Error stopping EEG recording:', err);
+    }
   };
 
   const renderQuestionInput = () => {
@@ -135,7 +168,6 @@ const QuestionInterface = () => {
             className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         );
-
       case 'likert':
         return (
           <div className="flex flex-col space-y-3">
@@ -154,7 +186,6 @@ const QuestionInterface = () => {
             ))}
           </div>
         );
-
       case 'multiple-choice':
         return (
           <div className="flex flex-col space-y-3">
@@ -173,7 +204,6 @@ const QuestionInterface = () => {
             ))}
           </div>
         );
-
       default:
         return null;
     }
@@ -200,7 +230,6 @@ const QuestionInterface = () => {
       <div className="bg-white shadow-lg rounded-lg overflow-hidden">
         <div className="p-6">
           <h2 className="text-2xl font-bold mb-4">Belonging Beyond Boundaries Study</h2>
-
           {currentState === 'ready' && (
             <div className="text-center py-8 space-y-4">
               <p className="text-gray-600">
@@ -216,20 +245,16 @@ const QuestionInterface = () => {
               </button>
             </div>
           )}
-
           {currentState === 'answering' && questions.length > 0 && (
             <div className="space-y-6">
               <div className="flex justify-between text-sm text-gray-500">
                 <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
               </div>
-              
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">
                   {questions[currentQuestionIndex].text}
                 </h3>
-                
                 {renderQuestionInput()}
-                
                 <div className="flex justify-end">
                   <button 
                     onClick={handleNextClick}
@@ -242,7 +267,6 @@ const QuestionInterface = () => {
               </div>
             </div>
           )}
-
           {currentState === 'completed' && (
             <div className="text-center py-8 space-y-4">
               <h3 className="text-lg font-medium">Thank you for participating!</h3>

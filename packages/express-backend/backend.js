@@ -2,6 +2,8 @@ import express from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import { exec } from 'child_process'; // For running Python script
+import fs from 'fs'; // For reading EEG data
 
 dotenv.config();
 
@@ -43,7 +45,8 @@ const responseSchema = new mongoose.Schema({
   answers: [{
     questionId: Number,
     answer: mongoose.Schema.Types.Mixed,
-    timeSpent: Number
+    timeSpent: Number,
+    eegData: String // Store EEG data as a string (CSV content)
   }],
   completed: {
     type: Boolean,
@@ -59,45 +62,18 @@ const initializeQuestions = async () => {
   const count = await Question.countDocuments();
   if (count === 0) {
     const defaultQuestions = [
+      { id: 1, text: "What is 15 + 27?", type: "number" },
+      { id: 2, text: "Name three European capitals.", type: "text" },
       { 
-        id: 1, 
-        text: "What is 15 + 27?", 
-        type: "number"
+        id: 3, text: "The earth is round.", type: "likert",
+        options: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"]
       },
       { 
-        id: 2, 
-        text: "Name three European capitals.", 
-        type: "text"
-      },
-      {
-        id: 3,
-        text: "The earth is round.",
-        type: "likert",
-        options: [
-          "Strongly Disagree",
-          "Disagree",
-          "Neutral",
-          "Agree",
-          "Strongly Agree"
-        ]
-      },
-      {
-        id: 4,
-        text: "Which of these is a primary color?",
-        type: "multiple-choice",
-        options: [
-          "Green",
-          "Red",
-          "Purple",
-          "Orange"
-        ],
+        id: 4, text: "Which of these is a primary color?", type: "multiple-choice",
+        options: ["Green", "Red", "Purple", "Orange"],
         correctAnswer: "Red"
       },
-      { 
-        id: 5, 
-        text: "What color is formed by mixing blue and yellow?", 
-        type: "text"
-      }
+      { id: 5, text: "What color is formed by mixing blue and yellow?", type: "text" }
     ];
 
     await Question.insertMany(defaultQuestions);
@@ -107,6 +83,85 @@ const initializeQuestions = async () => {
 
 initializeQuestions().catch(console.error);
 
+// EEG Recording Management
+let recordingProcess = null;
+
+app.post('/api/sessions/:sessionId/questions/:questionId/start-eeg', (req, res) => {
+  try {
+    if (recordingProcess) {
+      console.log('Attempting to stop the current recording process before starting a new one.');
+      recordingProcess.kill();
+      recordingProcess = null;  // Reset to allow a new recording process
+    }
+
+    console.log(`Starting EEG recording for session ${req.params.sessionId}, question ${req.params.questionId}`);
+    recordingProcess = exec('python ./eeg_recording.py', (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Error starting EEG recording: ${error.message}`);
+        if (!res.headersSent) {
+          return res.status(500).json({ message: 'Failed to start EEG recording', error: error.message });
+        }
+      }
+
+      if (stdout) {
+        console.log(`Python script stdout: ${stdout}`);
+      }
+      if (stderr) {
+        console.warn(`Python script stderr (non-critical): ${stderr}`);
+      }
+
+      if (!res.headersSent) {
+        res.status(200).json({ message: 'EEG recording started successfully.' });
+      }
+    });
+  } catch (error) {
+    console.error('Error starting EEG recording:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Error starting EEG recording.' });
+    }
+  }
+});
+
+
+// EEG Stop
+app.post('/api/sessions/:sessionId/questions/:questionId/stop-eeg', async (req, res) => {
+  try {
+    if (!recordingProcess) {
+      console.log('No EEG recording in progress to stop.');
+      return res.status(400).json({ message: 'No EEG recording in progress.' });
+    }
+
+    // Stop the recording process
+    recordingProcess.kill();
+    recordingProcess = null;  // Reset the recording process
+    console.log(`EEG recording stopped for session ${req.params.sessionId}, question ${req.params.questionId}`);
+
+    // Read EEG data from the CSV file
+    const eegData = fs.readFileSync('eeg_data.csv', 'utf8');
+    const { sessionId, questionId } = req.params;
+
+    // Find the session and add the EEG data to the corresponding answer
+    const session = await Response.findOne({ sessionId });
+    if (!session) {
+      return res.status(404).json({ message: 'Session not found.' });
+    }
+
+    const answer = session.answers.find(a => a.questionId === parseInt(questionId));
+    if (answer) {
+      answer.eegData = eegData;  // Attach EEG data to the answer
+    } else {
+      session.answers.push({ questionId, eegData });
+    }
+
+    await session.save();
+    res.status(200).json({ message: 'EEG recording stopped and data saved.' });
+  } catch (error) {
+    console.error('Error stopping EEG recording:', error);
+    res.status(500).json({ message: 'Error stopping EEG recording.' });
+  }
+});
+
+// Other API Endpoints
 app.get('/api/questions', async (req, res) => {
   try {
     const questions = await Question.find().sort('id');
