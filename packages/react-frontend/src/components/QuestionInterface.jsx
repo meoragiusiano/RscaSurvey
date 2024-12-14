@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Play, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Play, ChevronRight, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:8000/api';
@@ -12,125 +12,50 @@ const QuestionInterface = () => {
   const [questions, setQuestions] = useState([]);
   const [sessionId, setSessionId] = useState(null);
   const [error, setError] = useState(null);
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
   
-  const QUESTION_TIME_LIMIT = 60000;
+  const QUESTION_TIME_LIMIT = 60000; // 60 seconds
+  const timerRef = useRef(null);
 
   // Fetch questions on component mount
   useEffect(() => {
     const fetchQuestions = async () => {
+      setIsLoading(true);
       try {
         const response = await axios.get(`${API_URL}/questions`);
         setQuestions(response.data);
       } catch (err) {
-        setError('Failed to load questions. Please try again later.');
+        setError('Failed to load questions. Please check your connection.');
         console.error('Error fetching questions:', err);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchQuestions();
   }, []);
 
-  const moveToNextQuestion = useCallback(async () => {
-    const currentQuestion = questions[currentQuestionIndex];
-  
-    try {
-      // Stop EEG recording for the current question
-      await stopEEGRecording(sessionId, currentQuestion.id);
-  
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(prev => prev + 1);
-        setQuestionStartTime(Date.now());
-  
-        // Start EEG recording for the next question
-        await startEEGRecording(sessionId, questions[currentQuestionIndex + 1].id);
-      } else {
-        // Complete the session when there are no more questions
-        await axios.post(`${API_URL}/sessions/${sessionId}/complete`);
-        setCurrentState('completed');
-      }
-    } catch (err) {
-      setError('Failed to move to the next question or complete session. Please try again.');
-      console.error('Error moving to the next question:', err);
-    }
-  }, [currentQuestionIndex, questions, sessionId]);
-  
+  const startTimer = useCallback(() => {
+    const startTime = Date.now();
+    timerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(QUESTION_TIME_LIMIT - elapsed, 0);
+      
+      setTimeRemaining(remaining);
 
-  useEffect(() => {
-    let timeoutId;
-  
-    if (currentState === 'answering') {
-      timeoutId = setTimeout(() => {
-        console.log('Time limit reached, moving to next question');
+      if (remaining <= 0) {
+        clearInterval(timerRef.current);
         moveToNextQuestion();
-      }, QUESTION_TIME_LIMIT);
-    }
-  
-    return () => {
-      if (timeoutId) {
-        clearTimeout(timeoutId);
       }
-    };
-  }, [currentState, moveToNextQuestion]);
-  
-  const startQuestionnaire = async () => {
-    try {
-      const response = await axios.post(`${API_URL}/sessions`);
-      setSessionId(response.data.sessionId);
-      setCurrentState('answering');
-      setQuestionStartTime(Date.now());
+    }, 100);
+  }, []);
 
-      // Start EEG recording for the first question
-      await startEEGRecording(response.data.sessionId, questions[0].id);
-    } catch (err) {
-      setError('Failed to start session. Please try again.');
-      console.error('Error starting session:', err);
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
     }
-  };
-
-  const handleAnswer = async (answer) => {
-    const currentTime = Date.now();
-    const timeSpent = currentTime - questionStartTime;
-    
-    if (timeSpent <= QUESTION_TIME_LIMIT) {
-      try {
-        const currentQuestion = questions[currentQuestionIndex];
-        await axios.post(`${API_URL}/sessions/${sessionId}/answers`, {
-          questionId: currentQuestion.id,
-          answer,
-          timeSpent
-        });
-
-        setAnswers(prev => ({
-          ...prev,
-          [currentQuestion.id]: {
-            answer,
-            timeSpent
-          }
-        }));
-      } catch (err) {
-        setError('Failed to save answer. Please try again.');
-        console.error('Error saving answer:', err);
-      }
-    }
-  };
-
-  const handleNextClick = () => {
-    const currentTime = Date.now();
-    const timeSpent = currentTime - questionStartTime;
-
-    if (timeSpent <= QUESTION_TIME_LIMIT) {
-      moveToNextQuestion();
-    }
-  };
-
-  const resetQuestionnaire = () => {
-    setCurrentState('ready');
-    setCurrentQuestionIndex(0);
-    setAnswers({});
-    setQuestionStartTime(null);
-    setSessionId(null);
-    setError(null);
-  };
+  }, []);
 
   const startEEGRecording = async (sessionId, questionId) => {
     try {
@@ -152,6 +77,118 @@ const QuestionInterface = () => {
     }
   };
 
+  const moveToNextQuestion = useCallback(async () => {
+    const currentQuestion = questions[currentQuestionIndex];
+  
+    try {
+      stopTimer();
+      
+      // Stop EEG recording for the current question
+      await stopEEGRecording(sessionId, currentQuestion.id);
+  
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(prev => prev + 1);
+        setQuestionStartTime(Date.now());
+  
+        // Start EEG recording for the next question
+        await startEEGRecording(sessionId, questions[currentQuestionIndex + 1].id);
+        startTimer();
+      } else {
+        // Complete the session when there are no more questions
+        await axios.post(`${API_URL}/sessions/${sessionId}/complete`);
+        setCurrentState('completed');
+      }
+    } catch (err) {
+      setError('Failed to move to the next question. Please try again.');
+      console.error('Error moving to the next question:', err);
+    }
+  }, [currentQuestionIndex, questions, sessionId, stopTimer, startTimer]);
+
+  const startQuestionnaire = async () => {
+    setIsLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/sessions`);
+      setSessionId(response.data.sessionId);
+      setCurrentState('answering');
+      setQuestionStartTime(Date.now());
+
+      // Start EEG recording for the first question
+      await startEEGRecording(response.data.sessionId, questions[0].id);
+      startTimer();
+    } catch (err) {
+      setError('Failed to start session. Please check your connection.');
+      console.error('Error starting session:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAnswer = async (answer) => {
+    const currentTime = Date.now();
+    const timeSpent = currentTime - questionStartTime;
+    const currentQuestion = questions[currentQuestionIndex];
+
+    // Validate inputs
+    let isValid = true;
+    switch (currentQuestion.type) {
+      case 'number':
+        isValid = !isNaN(Number(answer)) && answer.trim() !== '';
+        break;
+      case 'text':
+        isValid = answer.trim().length > 0;
+        break;
+      default:
+        isValid = !!answer;
+    }
+
+    if (!isValid) {
+      setError(`Please provide a valid ${currentQuestion.type} answer.`);
+      return;
+    }
+    
+    if (timeSpent <= QUESTION_TIME_LIMIT) {
+      try {
+        await axios.post(`${API_URL}/sessions/${sessionId}/answers`, {
+          questionId: currentQuestion.id,
+          answer,
+          timeSpent
+        });
+
+        setAnswers(prev => ({
+          ...prev,
+          [currentQuestion.id]: {
+            answer,
+            timeSpent
+          }
+        }));
+        setError(null);
+      } catch (err) {
+        setError('Failed to save answer. Please try again.');
+        console.error('Error saving answer:', err);
+      }
+    }
+  };
+
+  const handleNextClick = () => {
+    const currentTime = Date.now();
+    const timeSpent = currentTime - questionStartTime;
+
+    if (timeSpent <= QUESTION_TIME_LIMIT) {
+      moveToNextQuestion();
+    }
+  };
+
+  const resetQuestionnaire = () => {
+    stopTimer();
+    setCurrentState('ready');
+    setCurrentQuestionIndex(0);
+    setAnswers({});
+    setQuestionStartTime(null);
+    setSessionId(null);
+    setError(null);
+    setTimeRemaining(QUESTION_TIME_LIMIT);
+  };
+
   const renderQuestionInput = () => {
     const currentQuestion = questions[currentQuestionIndex];
     const currentAnswer = answers[currentQuestion.id]?.answer || '';
@@ -166,11 +203,12 @@ const QuestionInterface = () => {
             onChange={(e) => handleAnswer(e.target.value)}
             placeholder="Type your answer here..."
             className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label={`Answer for: ${currentQuestion.text}`}
           />
         );
       case 'likert':
         return (
-          <div className="flex flex-col space-y-3">
+          <div className="flex flex-col space-y-3" role="radiogroup">
             {currentQuestion.options.map((option, index) => (
               <label key={index} className="flex items-center space-x-2 cursor-pointer">
                 <input
@@ -180,6 +218,7 @@ const QuestionInterface = () => {
                   checked={currentAnswer === option}
                   onChange={(e) => handleAnswer(e.target.value)}
                   className="w-4 h-4 text-blue-500"
+                  aria-label={option}
                 />
                 <span className="text-gray-700">{option}</span>
               </label>
@@ -188,7 +227,7 @@ const QuestionInterface = () => {
         );
       case 'multiple-choice':
         return (
-          <div className="flex flex-col space-y-3">
+          <div className="flex flex-col space-y-3" role="radiogroup">
             {currentQuestion.options.map((option, index) => (
               <label key={index} className="flex items-center space-x-2 cursor-pointer">
                 <input
@@ -198,6 +237,7 @@ const QuestionInterface = () => {
                   checked={currentAnswer === option}
                   onChange={(e) => handleAnswer(e.target.value)}
                   className="w-4 h-4 text-blue-500"
+                  aria-label={option}
                 />
                 <span className="text-gray-700">{option}</span>
               </label>
@@ -209,17 +249,31 @@ const QuestionInterface = () => {
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="w-full max-w-2xl mx-auto p-4 text-center">
+        <div className="flex items-center justify-center space-x-2">
+          <AlertCircle className="w-6 h-6 text-blue-500 animate-pulse" />
+          <p>Loading questions...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className="w-full max-w-2xl mx-auto p-4">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          <p>{error}</p>
-          <button 
-            onClick={resetQuestionnaire}
-            className="mt-4 bg-red-100 text-red-700 px-4 py-2 rounded-md hover:bg-red-200"
-          >
-            Try Again
-          </button>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 flex items-center space-x-4">
+          <AlertCircle className="w-6 h-6" />
+          <div>
+            <p>{error}</p>
+            <button 
+              onClick={resetQuestionnaire}
+              className="mt-4 bg-red-100 text-red-700 px-4 py-2 rounded-md hover:bg-red-200"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -230,6 +284,15 @@ const QuestionInterface = () => {
       <div className="bg-white shadow-lg rounded-lg overflow-hidden">
         <div className="p-6">
           <h2 className="text-2xl font-bold mb-4">Belonging Beyond Boundaries Study</h2>
+          
+          {currentState === 'answering' && questions.length > 0 && (
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-sm text-gray-500">
+                Question {currentQuestionIndex + 1} of {questions.length}
+              </div>
+            </div>
+          )}
+
           {currentState === 'ready' && (
             <div className="text-center py-8 space-y-4">
               <p className="text-gray-600">
@@ -239,17 +302,16 @@ const QuestionInterface = () => {
               <button 
                 onClick={startQuestionnaire}
                 className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
+                aria-label="Start Questionnaire"
               >
                 <Play className="w-4 h-4" />
                 Begin Questionnaire
               </button>
             </div>
           )}
+
           {currentState === 'answering' && questions.length > 0 && (
             <div className="space-y-6">
-              <div className="flex justify-between text-sm text-gray-500">
-                <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
-              </div>
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">
                   {questions[currentQuestionIndex].text}
@@ -259,6 +321,7 @@ const QuestionInterface = () => {
                   <button 
                     onClick={handleNextClick}
                     className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center gap-2"
+                    aria-label={currentQuestionIndex < questions.length - 1 ? 'Next Question' : 'Complete Questionnaire'}
                   >
                     {currentQuestionIndex < questions.length - 1 ? 'Next' : 'Complete'}
                     <ChevronRight className="w-4 h-4" />
@@ -267,6 +330,7 @@ const QuestionInterface = () => {
               </div>
             </div>
           )}
+
           {currentState === 'completed' && (
             <div className="text-center py-8 space-y-4">
               <h3 className="text-lg font-medium">Thank you for participating!</h3>
@@ -274,6 +338,7 @@ const QuestionInterface = () => {
               <button 
                 onClick={resetQuestionnaire}
                 className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+                aria-label="Start New Session"
               >
                 Start New Session
               </button>

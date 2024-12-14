@@ -2,8 +2,10 @@ import express from 'express';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import cors from 'cors';
-import { exec } from 'child_process'; // For running Python script
-import fs from 'fs'; // For reading EEG data
+import { spawn } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
@@ -31,6 +33,13 @@ const questionSchema = new mongoose.Schema({
   correctAnswer: String
 });
 
+const eegRecordingSchema = new mongoose.Schema({
+  sessionId: String,
+  questionId: Number,
+  filePath: String,
+  recordedAt: Date
+});
+
 const responseSchema = new mongoose.Schema({
   sessionId: {
     type: String,
@@ -46,7 +55,10 @@ const responseSchema = new mongoose.Schema({
     questionId: Number,
     answer: mongoose.Schema.Types.Mixed,
     timeSpent: Number,
-    eegData: String // Store EEG data as a string (CSV content)
+    eegRecordingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'EEGRecording'
+    }
   }],
   completed: {
     type: Boolean,
@@ -56,6 +68,7 @@ const responseSchema = new mongoose.Schema({
 
 const Question = mongoose.model('Question', questionSchema);
 const Response = mongoose.model('Response', responseSchema);
+const EEGRecording = mongoose.model('EEGRecording', eegRecordingSchema);
 
 // Initialize default questions if none exist
 const initializeQuestions = async () => {
@@ -83,85 +96,118 @@ const initializeQuestions = async () => {
 
 initializeQuestions().catch(console.error);
 
+// Ensure EEG recordings directory exists
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const EEG_RECORDINGS_DIR = path.join(__dirname, '../../eeg_recordings');
+if (!fs.existsSync(EEG_RECORDINGS_DIR)) {
+  fs.mkdirSync(EEG_RECORDINGS_DIR);
+}
+
 // EEG Recording Management
 let recordingProcess = null;
 
-app.post('/api/sessions/:sessionId/questions/:questionId/start-eeg', (req, res) => {
+app.post('/api/sessions/:sessionId/questions/:questionId/start-eeg', async (req, res) => {
   try {
+    const { sessionId, questionId } = req.params;
+    
+    // Stop any existing recording
     if (recordingProcess) {
-      console.log('Attempting to stop the current recording process before starting a new one.');
       recordingProcess.kill();
-      recordingProcess = null;  // Reset to allow a new recording process
+      recordingProcess = null;
     }
 
-    console.log(`Starting EEG recording for session ${req.params.sessionId}, question ${req.params.questionId}`);
-    recordingProcess = exec('python ./eeg_recording.py', (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Error starting EEG recording: ${error.message}`);
-        if (!res.headersSent) {
-          return res.status(500).json({ message: 'Failed to start EEG recording', error: error.message });
-        }
-      }
+    // Generate a unique filename for this EEG recording
+    const timestamp = Date.now();
+    const filename = `eeg_${sessionId}_${questionId}_${timestamp}.csv`;
+    const filepath = path.join(EEG_RECORDINGS_DIR, filename);
 
-      if (stdout) {
-        console.log(`Python script stdout: ${stdout}`);
-      }
-      if (stderr) {
-        console.warn(`Python script stderr (non-critical): ${stderr}`);
-      }
-
-      if (!res.headersSent) {
-        res.status(200).json({ message: 'EEG recording started successfully.' });
-      }
+    // Start Python recording script with filepath argument
+    recordingProcess = spawn('python', ['./eeg_recording.py', filepath], {
+      stdio: ['pipe', 'pipe', 'pipe']
     });
+
+    recordingProcess.stdout.on('data', (data) => {
+      console.log(`EEG Recording stdout: ${data}`);
+    });
+
+    recordingProcess.stderr.on('data', (data) => {
+      console.error(`EEG Recording stderr: ${data}`);
+    });
+
+    recordingProcess.on('error', (error) => {
+      console.error('Failed to start EEG recording:', error);
+      res.status(500).json({ message: 'Failed to start EEG recording' });
+    });
+
+    res.status(200).json({ message: 'EEG recording started successfully.' });
+
   } catch (error) {
     console.error('Error starting EEG recording:', error);
-    if (!res.headersSent) {
-      res.status(500).json({ message: 'Error starting EEG recording.' });
-    }
+    res.status(500).json({ message: 'Error starting EEG recording' });
   }
 });
 
-
-// EEG Stop
 app.post('/api/sessions/:sessionId/questions/:questionId/stop-eeg', async (req, res) => {
   try {
+    const { sessionId, questionId } = req.params;
+
     if (!recordingProcess) {
-      console.log('No EEG recording in progress to stop.');
       return res.status(400).json({ message: 'No EEG recording in progress.' });
     }
 
-    // Stop the recording process
+    // Kill the recording process
     recordingProcess.kill();
-    recordingProcess = null;  // Reset the recording process
-    console.log(`EEG recording stopped for session ${req.params.sessionId}, question ${req.params.questionId}`);
+    recordingProcess = null;
 
-    // Read EEG data from the CSV file
-    const eegData = fs.readFileSync('eeg_data.csv', 'utf8');
-    const { sessionId, questionId } = req.params;
+    // Find the most recently created EEG recording file
+    const files = fs.readdirSync(EEG_RECORDINGS_DIR)
+      .filter(f => f.startsWith(`eeg_${sessionId}_${questionId}_`))
+      .sort((a, b) => fs.statSync(path.join(EEG_RECORDINGS_DIR, b)).mtime.getTime() - 
+                      fs.statSync(path.join(EEG_RECORDINGS_DIR, a)).mtime.getTime());
 
-    // Find the session and add the EEG data to the corresponding answer
+    if (files.length === 0) {
+      return res.status(404).json({ message: 'No EEG recording found.' });
+    }
+
+    const filepath = path.join(EEG_RECORDINGS_DIR, files[0]);
+
+    // Save recording metadata to database
+    const eegRecording = new EEGRecording({
+      sessionId,
+      questionId: parseInt(questionId),
+      filePath: filepath,
+      recordedAt: new Date()
+    });
+    await eegRecording.save();
+
+    // Update the session's answer with EEG recording reference
     const session = await Response.findOne({ sessionId });
-    if (!session) {
-      return res.status(404).json({ message: 'Session not found.' });
+    if (session) {
+      const answerIndex = session.answers.findIndex(a => a.questionId === parseInt(questionId));
+      if (answerIndex >= 0) {
+        session.answers[answerIndex].eegRecordingId = eegRecording._id;
+      } else {
+        session.answers.push({ 
+          questionId: parseInt(questionId), 
+          eegRecordingId: eegRecording._id 
+        });
+      }
+      await session.save();
     }
 
-    const answer = session.answers.find(a => a.questionId === parseInt(questionId));
-    if (answer) {
-      answer.eegData = eegData;  // Attach EEG data to the answer
-    } else {
-      session.answers.push({ questionId, eegData });
-    }
+    res.status(200).json({ 
+      message: 'EEG recording stopped and metadata saved.',
+      recordingId: eegRecording._id
+    });
 
-    await session.save();
-    res.status(200).json({ message: 'EEG recording stopped and data saved.' });
   } catch (error) {
     console.error('Error stopping EEG recording:', error);
-    res.status(500).json({ message: 'Error stopping EEG recording.' });
+    res.status(500).json({ message: 'Error stopping EEG recording' });
   }
 });
 
-// Other API Endpoints
+// Existing API Endpoints (kept the same as before)
 app.get('/api/questions', async (req, res) => {
   try {
     const questions = await Question.find().sort('id');

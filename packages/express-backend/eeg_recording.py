@@ -1,27 +1,42 @@
 from pylsl import StreamInlet, resolve_byprop
 import csv
 import time
+import sys
 
-# Resolve EEG stream
-streams = resolve_byprop('type', 'EEG', timeout=2)
-if streams:
-    print("EEG stream found.")
+def record_eeg(output_file):
+    # Resolve EEG stream
+    streams = resolve_byprop('type', 'EEG', timeout=2)
+    if not streams:
+        print("No EEG stream found. Ensure your EEG device is connected and streaming.")
+        sys.exit(1)
+
+    print("EEG stream found. Starting recording...")
     inlet = StreamInlet(streams[0])
 
-    # Open a CSV file to record EEG data
-    with open('eeg_data.csv', 'w', newline='') as csvfile:
+    # Open CSV file for recording
+    with open(output_file, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["Timestamp", "Channel 1", "Channel 2", "Channel 3", "Channel 4"])  # Adjust columns as needed
+        writer.writerow(["Timestamp", "Channel 1", "Channel 2", "Channel 3", "Channel 4", "Channel 5"]) 
 
-        print("Recording EEG data...")
+        print(f"Recording to {output_file}")
         start_time = time.time()
-        while True:
-            sample, timestamp = inlet.pull_sample()
-            writer.writerow([timestamp] + sample)
+        try:
+            while True:
+                sample, timestamp = inlet.pull_sample()
+                writer.writerow([timestamp] + sample)
 
-            # Stop recording after a set time (optional safeguard)
-            if time.time() - start_time > 120:  # 120 seconds max as a safeguard
-                break
+                # Stop recording after a set time
+                if time.time() - start_time > 120:  # 2 minutes max
+                    break
+        except KeyboardInterrupt:
+            print("Recording manually stopped.")
+        finally:
+            print("EEG recording complete.")
 
-else:
-    print("No EEG stream found. Ensure your EEG device is connected and streaming.")
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Please provide an output file path.")
+        sys.exit(1)
+    
+    output_file = sys.argv[1]
+    record_eeg(output_file)
