@@ -6,6 +6,8 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { defaultQuestions } from './questions.js';
+
 
 dotenv.config();
 
@@ -24,13 +26,15 @@ mongoose.connect(MONGO_CONNECTION_STRING)
 // Schemas
 const questionSchema = new mongoose.Schema({
   id: Number,
+  section: String,
+  subsection: String,
   text: String,
   type: {
     type: String,
-    enum: ['text', 'number', 'likert', 'multiple-choice']
+    enum: ['text', 'number', 'likert', 'multiple-choice', 'multiple-select', 'boolean']
   },
   options: [String],
-  correctAnswer: String
+  definitions: Map,
 });
 
 const eegRecordingSchema = new mongoose.Schema({
@@ -74,21 +78,6 @@ const EEGRecording = mongoose.model('EEGRecording', eegRecordingSchema);
 const initializeQuestions = async () => {
   const count = await Question.countDocuments();
   if (count === 0) {
-    const defaultQuestions = [
-      { id: 1, text: "What is 15 + 27?", type: "number" },
-      { id: 2, text: "Name three European capitals.", type: "text" },
-      { 
-        id: 3, text: "The earth is round.", type: "likert",
-        options: ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"]
-      },
-      { 
-        id: 4, text: "Which of these is a primary color?", type: "multiple-choice",
-        options: ["Green", "Red", "Purple", "Orange"],
-        correctAnswer: "Red"
-      },
-      { id: 5, text: "What color is formed by mixing blue and yellow?", type: "text" }
-    ];
-
     await Question.insertMany(defaultQuestions);
     console.log('Default questions initialized');
   }
