@@ -23,7 +23,6 @@ export const defaultQuestions = [
         "Southeast Asian", 
         "Other Asian",
         "Filipina/o/x",
-        "Native Hawaiian or Pacific Islander",
         "Indigenous / Aboriginal Identity",
         "Mexican American or Chicano/a/x",
         "Puerto Rican",

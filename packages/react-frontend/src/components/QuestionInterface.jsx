@@ -127,24 +127,6 @@ const QuestionInterface = () => {
     const currentTime = Date.now();
     const timeSpent = currentTime - questionStartTime;
     const currentQuestion = questions[currentQuestionIndex];
-
-    // Validate inputs
-    let isValid = true;
-    switch (currentQuestion.type) {
-      case 'number':
-        isValid = !isNaN(Number(answer)) && answer.trim() !== '';
-        break;
-      case 'text':
-        isValid = answer.trim().length > 0;
-        break;
-      default:
-        isValid = !!answer;
-    }
-
-    if (!isValid) {
-      setError(`Please provide a valid ${currentQuestion.type} answer.`);
-      return;
-    }
     
     if (timeSpent <= QUESTION_TIME_LIMIT) {
       try {
@@ -207,13 +189,14 @@ const QuestionInterface = () => {
           />
         );
       case 'likert':
+      case 'multiple-choice':
         return (
           <div className="flex flex-col space-y-3" role="radiogroup">
             {currentQuestion.options.map((option, index) => (
               <label key={index} className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="radio"
-                  name="likert"
+                  name={currentQuestion.type}
                   value={option}
                   checked={currentAnswer === option}
                   onChange={(e) => handleAnswer(e.target.value)}
@@ -225,23 +208,62 @@ const QuestionInterface = () => {
             ))}
           </div>
         );
-      case 'multiple-choice':
+      case 'multiple-select':
         return (
-          <div className="flex flex-col space-y-3" role="radiogroup">
+          <div className="flex flex-col space-y-3" role="group">
             {currentQuestion.options.map((option, index) => (
               <label key={index} className="flex items-center space-x-2 cursor-pointer">
                 <input
-                  type="radio"
-                  name="multiple-choice"
+                  type="checkbox"
                   value={option}
-                  checked={currentAnswer === option}
-                  onChange={(e) => handleAnswer(e.target.value)}
-                  className="w-4 h-4 text-blue-500"
+                  checked={Array.isArray(currentAnswer) && currentAnswer.includes(option)}
+                  onChange={(e) => {
+                    const selectedOptions = Array.isArray(currentAnswer) ? [...currentAnswer] : [];
+                    if (e.target.checked) {
+                      selectedOptions.push(option);
+                    } else {
+                      const index = selectedOptions.indexOf(option);
+                      if (index > -1) {
+                        selectedOptions.splice(index, 1);
+                      }
+                    }
+                    handleAnswer(selectedOptions);
+                  }}
+                  className="w-4 h-4 text-blue-500 rounded"
                   aria-label={option}
                 />
                 <span className="text-gray-700">{option}</span>
               </label>
             ))}
+          </div>
+        );
+        case 'boolean':
+        return (
+          <div className="flex flex-col space-y-3" role="radiogroup">
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="radio"
+                name={`boolean-${currentQuestion.id}`}
+                value="yes"
+                checked={currentAnswer === "yes"}
+                onChange={() => handleAnswer("yes")}
+                className="w-4 h-4 text-blue-500"
+                aria-label="Yes"
+              />
+              <span className="text-gray-700">Yes</span>
+            </label>
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="radio"
+                name={`boolean-${currentQuestion.id}`}
+                value="no"
+                checked={currentAnswer === "no"}
+                onChange={() => handleAnswer("no")}
+                className="w-4 h-4 text-blue-500"
+                aria-label="No"
+              />
+              <span className="text-gray-700">No</span>
+            </label>
           </div>
         );
       default:

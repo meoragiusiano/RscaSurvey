@@ -8,7 +8,6 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { defaultQuestions } from './questions.js';
 
-
 dotenv.config();
 
 const app = express();
@@ -37,11 +36,27 @@ const questionSchema = new mongoose.Schema({
   definitions: Map,
 });
 
-const eegRecordingSchema = new mongoose.Schema({
-  sessionId: String,
-  questionId: Number,
-  filePath: String,
-  recordedAt: Date
+const backgroundProfileSchema = new mongoose.Schema({
+  age: Number,
+  ethnicity: [String],
+  gender: String,
+  transgender: String,
+  firstGenStudent: Boolean,
+  csStudent: Boolean,
+  major: String,
+  timeSpentOnQuestions: Map, // stores questionId -> timeSpent
+  eegRecordings: [{
+    questionId: Number,
+    recordingId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'EEGRecording'
+    }
+  }],
+  // Check for duplicates
+  profileHash: {
+    type: String,
+    unique: true
+  }
 });
 
 const responseSchema = new mongoose.Schema({
@@ -55,6 +70,10 @@ const responseSchema = new mongoose.Schema({
     required: true
   },
   endTime: Date,
+  backgroundProfile: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'BackgroundProfile'
+  },
   answers: [{
     questionId: Number,
     answer: mongoose.Schema.Types.Mixed,
@@ -70,8 +89,16 @@ const responseSchema = new mongoose.Schema({
   }
 });
 
+const eegRecordingSchema = new mongoose.Schema({
+  sessionId: String,
+  questionId: Number,
+  filePath: String,
+  recordedAt: Date
+});
+
 const Question = mongoose.model('Question', questionSchema);
 const Response = mongoose.model('Response', responseSchema);
+const BackgroundProfile = mongoose.model('BackgroundProfile', backgroundProfileSchema);
 const EEGRecording = mongoose.model('EEGRecording', eegRecordingSchema);
 
 // Initialize default questions if none exist
@@ -93,6 +120,12 @@ if (!fs.existsSync(EEG_RECORDINGS_DIR)) {
   fs.mkdirSync(EEG_RECORDINGS_DIR);
 }
 
+// Helper function to generate profile hash
+const generateProfileHash = (profile) => {
+  const sortedEthnicity = [...profile.ethnicity].sort().join('|');
+  return `${profile.age}-${sortedEthnicity}-${profile.gender}-${profile.transgender}-${profile.firstGenStudent}-${profile.csStudent}-${profile.major}`;
+};
+
 // EEG Recording Management
 let recordingProcess = null;
 
@@ -100,18 +133,15 @@ app.post('/api/sessions/:sessionId/questions/:questionId/start-eeg', async (req,
   try {
     const { sessionId, questionId } = req.params;
     
-    // Stop any existing recording
     if (recordingProcess) {
       recordingProcess.kill();
       recordingProcess = null;
     }
 
-    // Generate a unique filename for this EEG recording
     const timestamp = Date.now();
     const filename = `eeg_${sessionId}_${questionId}_${timestamp}.csv`;
     const filepath = path.join(EEG_RECORDINGS_DIR, filename);
 
-    // Start Python recording script with filepath argument
     recordingProcess = spawn('python', ['./eeg_recording.py', filepath], {
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -145,11 +175,9 @@ app.post('/api/sessions/:sessionId/questions/:questionId/stop-eeg', async (req, 
       return res.status(400).json({ message: 'No EEG recording in progress.' });
     }
 
-    // Kill the recording process
     recordingProcess.kill();
     recordingProcess = null;
 
-    // Find the most recently created EEG recording file
     const files = fs.readdirSync(EEG_RECORDINGS_DIR)
       .filter(f => f.startsWith(`eeg_${sessionId}_${questionId}_`))
       .sort((a, b) => fs.statSync(path.join(EEG_RECORDINGS_DIR, b)).mtime.getTime() - 
@@ -161,7 +189,6 @@ app.post('/api/sessions/:sessionId/questions/:questionId/stop-eeg', async (req, 
 
     const filepath = path.join(EEG_RECORDINGS_DIR, files[0]);
 
-    // Save recording metadata to database
     const eegRecording = new EEGRecording({
       sessionId,
       questionId: parseInt(questionId),
@@ -170,19 +197,30 @@ app.post('/api/sessions/:sessionId/questions/:questionId/stop-eeg', async (req, 
     });
     await eegRecording.save();
 
-    // Update the session's answer with EEG recording reference
-    const session = await Response.findOne({ sessionId });
-    if (session) {
-      const answerIndex = session.answers.findIndex(a => a.questionId === parseInt(questionId));
-      if (answerIndex >= 0) {
-        session.answers[answerIndex].eegRecordingId = eegRecording._id;
-      } else {
-        session.answers.push({ 
-          questionId: parseInt(questionId), 
-          eegRecordingId: eegRecording._id 
-        });
+    // Update background profile if it's a demographic question
+    const question = await Question.findOne({ id: parseInt(questionId) });
+    if (question && question.section === 'demographic') {
+      const session = await Response.findOne({ sessionId });
+      if (session && session.backgroundProfile) {
+        const backgroundProfile = await BackgroundProfile.findById(session.backgroundProfile);
+        if (backgroundProfile) {
+          backgroundProfile.eegRecordings.push({
+            questionId: parseInt(questionId),
+            recordingId: eegRecording._id
+          });
+          await backgroundProfile.save();
+        }
       }
-      await session.save();
+    } else {
+      // Update regular response
+      const session = await Response.findOne({ sessionId });
+      if (session) {
+        const answerIndex = session.answers.findIndex(a => a.questionId === parseInt(questionId));
+        if (answerIndex >= 0) {
+          session.answers[answerIndex].eegRecordingId = eegRecording._id;
+        }
+        await session.save();
+      }
     }
 
     res.status(200).json({ 
@@ -196,7 +234,7 @@ app.post('/api/sessions/:sessionId/questions/:questionId/stop-eeg', async (req, 
   }
 });
 
-// Existing API Endpoints (kept the same as before)
+// API Endpoints
 app.get('/api/questions', async (req, res) => {
   try {
     const questions = await Question.find().sort('id');
@@ -231,11 +269,79 @@ app.post('/api/sessions/:sessionId/answers', async (req, res) => {
       return res.status(404).json({ message: 'Session not found' });
     }
 
-    const answerIndex = session.answers.findIndex(a => a.questionId === questionId);
-    if (answerIndex >= 0) {
-      session.answers[answerIndex] = { questionId, answer, timeSpent };
+    const question = await Question.findOne({ id: questionId });
+    if (!question) {
+      return res.status(404).json({ message: 'Question not found' });
+    }
+
+    if (question.section === 'demographic') {
+      // Get or create background profile
+      let backgroundProfile = await BackgroundProfile.findById(session.backgroundProfile);
+      
+      if (!backgroundProfile) {
+        backgroundProfile = new BackgroundProfile({
+          timeSpentOnQuestions: new Map(),
+          eegRecordings: []
+        });
+      }
+
+      // Update the appropriate field based on the question
+      switch (question.text) {
+        case "What is your age?":
+          backgroundProfile.age = answer;
+          break;
+        case "What is your race/ethnicity? Check all that apply.":
+          backgroundProfile.ethnicity = answer;
+          break;
+        case "What is your gender?":
+          backgroundProfile.gender = answer;
+          break;
+        case "Do you identify as transgender?":
+          backgroundProfile.transgender = answer;
+          break;
+        case "Are you a first-generation college student?":
+          backgroundProfile.firstGenStudent = answer;
+          break;
+        case "Are you a Computer Science major?":
+          backgroundProfile.csStudent = answer;
+          break;
+        case "If you stated that you are not a Computer Science major, please indicate your major":
+          backgroundProfile.major = answer;
+          break;
+      }
+
+      backgroundProfile.timeSpentOnQuestions.set(questionId.toString(), timeSpent);
+
+      // Generate and set profile hash
+      if (backgroundProfile.age && backgroundProfile.ethnicity && backgroundProfile.gender) {
+        backgroundProfile.profileHash = generateProfileHash(backgroundProfile);
+      }
+
+      try {
+        // Try to save the profile (might fail if duplicate)
+        await backgroundProfile.save();
+      } catch (error) {
+        if (error.code === 11000) { // Duplicate key error
+          // Find existing profile with same hash
+          const existingProfile = await BackgroundProfile.findOne({
+            profileHash: backgroundProfile.profileHash
+          });
+          backgroundProfile = existingProfile;
+        } else {
+          throw error;
+        }
+      }
+
+      // Update session with background profile reference
+      session.backgroundProfile = backgroundProfile._id;
     } else {
-      session.answers.push({ questionId, answer, timeSpent });
+      // Handle regular question
+      const answerIndex = session.answers.findIndex(a => a.questionId === questionId);
+      if (answerIndex >= 0) {
+        session.answers[answerIndex] = { questionId, answer, timeSpent };
+      } else {
+        session.answers.push({ questionId, answer, timeSpent });
+      }
     }
 
     await session.save();
@@ -267,7 +373,8 @@ app.post('/api/sessions/:sessionId/complete', async (req, res) => {
 
 app.get('/api/sessions/:sessionId', async (req, res) => {
   try {
-    const session = await Response.findOne({ sessionId: req.params.sessionId });
+    const session = await Response.findOne({ sessionId: req.params.sessionId })
+      .populate('backgroundProfile');
 
     if (!session) {
       return res.status(404).json({ message: 'Session not found' });
@@ -277,6 +384,31 @@ app.get('/api/sessions/:sessionId', async (req, res) => {
   } catch (error) {
     console.error('Error fetching session:', error);
     res.status(500).json({ message: 'Error fetching session' });
+  }
+});
+
+app.get('/api/background-profiles/stats', async (req, res) => {
+  try {
+    const stats = await BackgroundProfile.aggregate([
+      {
+        $group: {
+          _id: null,
+          uniqueProfiles: { $sum: 1 },
+          averageAge: { $avg: '$age' },
+          genderDistribution: {
+            $push: '$gender'
+          },
+          majorDistribution: {
+            $push: '$major'
+          }
+        }
+      }
+    ]);
+
+    res.json(stats[0]);
+  } catch (error) {
+    console.error('Error getting background profile stats:', error);
+    res.status(500).json({ message: 'Error getting statistics' });
   }
 });
 
