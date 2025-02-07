@@ -316,6 +316,72 @@ export const defaultQuestions = [
         options: ["Strongly Disagree", "Disagree", "Somewhat Disagree", "Neutral", "Somewhat Agree", "Agree", "Strongly Agree"],
       },
 
+      // Parsons Problem Questions
+      {
+        section: "parsons",
+        text: "Rearrange the following code blocks to define a function that adds two numbers and then use the function to add the numbers 5 and 10.",
+        type: "parsons-problem",
+        options: [
+          "return total",
+          "total = a + b",
+          "a = 5",
+          "my_add(a, b)",
+          "def my_add(a, b):",
+          "b = 10"
+        ],
+        correctOrder: [
+          "def my_add(a,b):",
+          "total = a+b",
+          "return total",
+          "a = 5",
+          "b = 10",
+          "my_add(a,b)"
+        ],
+        required: true
+      },
+      {
+        section: "parsons",
+        text: "Rearrange the following code blocks to create a Python program that calculates the area of a rectangle. The width of the rectangle is 5 units and the height is 10 units.",
+        type: "parsons-problem",
+        options: [
+          "area = width * height",
+          "width = 5",
+          "height = 10",
+          "print('The area of the rectangle is: ', area)"
+        ],
+        correctOrder: [
+          "width = 5",
+          "height = 10",
+          "area = width * height",
+          "print('The area of the rectangle is: ', area)"
+        ],
+        required: true
+      },
+      {
+        section: "parsons",
+        text: "Rearrange the following code blocks to implement a Python program that checks if a number is positive, negative, or zero. The number to test is -3.",
+        type: "parsons-problem",
+        options: [
+          "print('Positive')",
+          "number = -3",
+          "elif number == 0:",
+          "else:",
+          "print('Zero')",
+          "if number > 0:",
+          "print('Negative')"
+        ],
+        correctOrder: [
+          "number = -3",
+          "if number > 0:",
+          "print('Positive')",
+          "elif number == 0:",
+          "print('Zero')",
+          "else:",
+          "print('Negative')"
+        ],
+        required: true
+      },      
+
       // Feedback
       {
         section: "feedback",

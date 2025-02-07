@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, ChevronRight, AlertCircle } from 'lucide-react';
 import axios from 'axios';
+import ParsonsProblem from './ParsonsProblem';
 
 const API_URL = 'http://localhost:8000/api';
 
@@ -127,39 +128,55 @@ const QuestionInterface = () => {
     const currentTime = Date.now();
     const timeSpent = currentTime - questionStartTime;
     const currentQuestion = questions[currentQuestionIndex];
-    
-    if (timeSpent <= QUESTION_TIME_LIMIT) {
-      try {
-        await axios.post(`${API_URL}/sessions/${sessionId}/answers`, {
-          questionId: currentQuestion.id,
-          answer,
-          timeSpent
-        });
-
-        setAnswers(prev => ({
-          ...prev,
-          [currentQuestion.id]: {
-            answer,
-            timeSpent
-          }
-        }));
-        setError(null);
-      } catch (err) {
-        setError('Failed to save answer. Please try again.');
-        console.error('Error saving answer:', err);
+  
+    setAnswers(prev => ({
+      ...prev,
+      [currentQuestion.id]: {
+        answer,
+        timeSpent
       }
-    }
+    }));
   };
-
-  const handleNextClick = () => {
+  
+  const handleNextClick = async () => {
     const currentTime = Date.now();
     const timeSpent = currentTime - questionStartTime;
-
+    const currentQuestion = questions[currentQuestionIndex];
+  
     if (timeSpent <= QUESTION_TIME_LIMIT) {
+      const currentAnswer = answers[currentQuestion.id]?.answer; 
+  
+      if (currentAnswer) {
+        await sendAnswerToDB(currentAnswer, timeSpent, currentQuestion.id);
+      }
+  
       moveToNextQuestion();
     }
   };
-
+  
+  // send the answer to the database
+  const sendAnswerToDB = async (answer, timeSpent, questionId) => {
+    try {
+      await axios.post(`${API_URL}/sessions/${sessionId}/answers`, {
+        questionId,
+        answer,
+        timeSpent
+      });
+  
+      setAnswers(prev => ({
+        ...prev,
+        [questionId]: {
+          answer,
+          timeSpent
+        }
+      }));
+      setError(null);
+    } catch (err) {
+      setError('Failed to save answer. Please try again.');
+      console.error('Error saving answer:', err);
+    }
+  };
+  
   const resetQuestionnaire = () => {
     stopTimer();
     setCurrentState('ready');
@@ -266,6 +283,8 @@ const QuestionInterface = () => {
             </label>
           </div>
         );
+      case 'parsons-problem':
+        return <ParsonsProblem question={currentQuestion} currentAnswer={currentAnswer} handleAnswer={handleAnswer} />;
       default:
         return null;
     }

@@ -30,11 +30,15 @@ const questionSchema = new mongoose.Schema({
   text: String,
   type: {
     type: String,
-    enum: ['text', 'number', 'likert', 'multiple-choice', 'multiple-select', 'boolean']
+    enum: ['text', 'number', 'likert', 'multiple-choice', 'multiple-select', 'boolean', 'parsons-problem'], 
   },
   options: [String],
   definitions: Map,
+  // Additional fields for Parsons Problem
+  correctOrder: [String],  // Array of correct code snippet identifiers or content
+  providedSnippets: [String], // Array of snippets to display to the user
 });
+
 
 const backgroundProfileSchema = new mongoose.Schema({
   age: Number,
@@ -212,7 +216,6 @@ app.post('/api/sessions/:sessionId/questions/:questionId/stop-eeg', async (req, 
         }
       }
     } else {
-      // Update regular response
       const session = await Response.findOne({ sessionId });
       if (session) {
         const answerIndex = session.answers.findIndex(a => a.questionId === parseInt(questionId));
