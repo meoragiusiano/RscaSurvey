@@ -11,25 +11,25 @@ const ParsonsProblem = ({ question, currentAnswer, handleAnswer }) => {
   }, []); 
 
   const handleDragStart = (event, item) => {
-    console.log(`Drag started with item: ${item}`);
+    // console.log(`Drag started with item: ${item}`);
     setDraggedItem(item);
   };
 
   const handleDrop = (event, targetItem, targetIndex) => {
     event.preventDefault();
 
-    console.log("Current Answer:", currentAnswer);
-    console.log("Dragged Item:", draggedItem);
-    console.log("Target Item:", targetItem);
-    console.log("Target Index:", targetIndex);
+    // console.log("Current Answer:", currentAnswer);
+    // console.log("Dragged Item:", draggedItem);
+    // console.log("Target Item:", targetItem);
+    // console.log("Target Index:", targetIndex);
 
     const updatedAnswer = [...currentAnswer]; 
 
-    console.log("Before update:", updatedAnswer);
+    // console.log("Before update:", updatedAnswer);
 
     updatedAnswer[targetIndex] = draggedItem;
 
-    console.log("Updated answer after drag:", updatedAnswer);
+    // console.log("Updated answer after drag:", updatedAnswer);
 
     handleAnswer(updatedAnswer);
   };
@@ -39,7 +39,7 @@ const ParsonsProblem = ({ question, currentAnswer, handleAnswer }) => {
   };
 
   useEffect(() => {
-    console.log("Updated currentAnswer (useEffect):", currentAnswer);
+    // console.log("Updated currentAnswer (useEffect):", currentAnswer);
   }, [currentAnswer]);
 
   return (
