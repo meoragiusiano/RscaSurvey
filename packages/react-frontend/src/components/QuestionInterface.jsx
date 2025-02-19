@@ -19,6 +19,14 @@ const QuestionInterface = () => {
   const QUESTION_TIME_LIMIT = 60000; // 60 seconds
   const timerRef = useRef(null);
 
+  const [dividerMessagesIndex, setDividerMessageIndex] = useState(0);
+  const dividerMessages = [
+    "Background.",
+    "Questionaire.",
+    "Parsons.",
+    "Feedback.",
+  ];
+
   // Fetch questions on component mount
   useEffect(() => {
     const fetchQuestions = async () => {
@@ -86,6 +94,13 @@ const QuestionInterface = () => {
       
       // Stop EEG recording for the current question
       await stopEEGRecording(sessionId, currentQuestion.id);
+
+      
+      // Set indicies for the divider here (background, questionaire, parsons, feedback)
+      const dividerIndices = new Set([3, 8, 10, 14]);
+      if (dividerIndices.has(currentQuestionIndex)) {
+        setCurrentState("divider");
+      }
   
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(prev => prev + 1);
@@ -290,6 +305,26 @@ const QuestionInterface = () => {
     }
   };
 
+  const renderDivider = () => {
+    const currentMessage = dividerMessages[dividerMessagesIndex];
+    return (
+      <div className="text-center py-8 space-y-4">
+        <p className="text-gray-600">{currentMessage}</p>
+        <button
+          onClick={() => {
+            setCurrentState("answering");
+            setDividerMessageIndex(dividerMessagesIndex + 1);
+          }}
+          className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
+          aria-label="Continue Questionnaire"
+        >
+          Ready to Continue!
+        </button>
+      </div>
+    );
+  };
+
+
   if (isLoading) {
     return (
       <div className="w-full max-w-2xl mx-auto p-4 text-center">
@@ -351,6 +386,7 @@ const QuestionInterface = () => {
             </div>
           )}
 
+          {currentState === "divider" && <>{renderDivider()}</>}
           {currentState === 'answering' && questions.length > 0 && (
             <div className="space-y-6">
               <div className="space-y-4">
