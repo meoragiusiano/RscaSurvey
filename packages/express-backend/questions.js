@@ -1,84 +1,4 @@
 export const defaultQuestions = [
-    // Demographic Information
-    {
-      section: "demographic",
-      text: "What is your age?",
-      type: "number",
-      required: true
-    },
-    {
-      section: "demographic",
-      text: "What is your race/ethnicity? Check all that apply.",
-      type: "multiple-select",
-      options: [
-        "Hispanic or Latino",
-        "Not Hispanic or Latino",
-        "American Indian or Alaska Native",
-        "Asian",
-        "Black or African American",
-        "Native Hawaiian or Other Pacific Islander",
-        "White",
-        "East Asian",
-        "South Asian",
-        "Southeast Asian", 
-        "Other Asian",
-        "Filipina/o/x",
-        "Indigenous / Aboriginal Identity",
-        "Mexican American or Chicano/a/x",
-        "Puerto Rican",
-        "Central American",
-        "Other Latino/a/x",
-        "Race/ethnicity unknown"
-      ],
-      definitions: new Map([
-        ["Hispanic or Latino", "A person of Cuban, Mexican, Puerto Rican, South or Central American, or other Spanish culture or origin, regardless of race."],
-        ["American Indian or Alaska Native", "A person having origins in any of the original peoples of North and South America (including Central America) who maintains cultural identification through tribal affiliation or community attachment."],
-        ["Asian", "A person having origins in any of the original peoples of the Far East, Southeast Asia, or the Indian Subcontinent."],
-        ["Black or African American", "A person having origins in any of the black racial groups of Africa."],
-        ["Native Hawaiian or Other Pacific Islander", "A person having origins in any of the original peoples of Hawaii, Guam, Samoa, or other Pacific Islands."],
-        ["White", "A person having origins in any of the original peoples of Europe, the Middle East, or North Africa."]
-      ]),
-      required: true
-    },
-    {
-        section: "demographic",
-        text: "What is your gender?",
-        type: "multiple-choice",
-        options: [
-          "Man",
-          "Woman",
-          "Non-binary",
-          "Genderqueer or gender non-conforming",
-          "Another identity not listed",
-          "I'd rather not say"
-        ],
-      },
-      {
-        section: "demographic",
-        text: "Do you identify as transgender?",
-        type: "multiple-choice",
-        options: [
-          "No",
-          "Yes",
-          "I'd rather not say"
-        ],
-      },
-      {
-        section: "demographic",
-        text: "Are you a first-generation college student?",
-        type: "boolean",
-      },
-      {
-        section: "demographic",
-        text: "Are you a Computer Science major?",
-        type: "boolean",
-      },
-      {
-        section: "demographic",
-        text: "If you stated that you are not a Computer Science major, please indicate your major",
-        type: "text",
-      },
-
       // Belonging Questions - Membership
       {
         section: "belonging",
@@ -380,7 +300,87 @@ export const defaultQuestions = [
           "print('Negative')"
         ],
         required: true
-      },      
+      },  
+      
+      // Demographic Information
+      {
+        section: "demographic",
+        text: "What is your age?",
+        type: "number",
+        required: true
+      },
+      {
+        section: "demographic",
+        text: "What is your race/ethnicity? Check all that apply.",
+        type: "multiple-select",
+        options: [
+          "Hispanic or Latino",
+          "Not Hispanic or Latino",
+          "American Indian or Alaska Native",
+          "Asian",
+          "Black or African American",
+          "Native Hawaiian or Other Pacific Islander",
+          "White",
+          "East Asian",
+          "South Asian",
+          "Southeast Asian", 
+          "Other Asian",
+          "Filipina/o/x",
+          "Indigenous / Aboriginal Identity",
+          "Mexican American or Chicano/a/x",
+          "Puerto Rican",
+          "Central American",
+          "Other Latino/a/x",
+          "Race/ethnicity unknown"
+        ],
+        definitions: new Map([
+          ["Hispanic or Latino", "A person of Cuban, Mexican, Puerto Rican, South or Central American, or other Spanish culture or origin, regardless of race."],
+          ["American Indian or Alaska Native", "A person having origins in any of the original peoples of North and South America (including Central America) who maintains cultural identification through tribal affiliation or community attachment."],
+          ["Asian", "A person having origins in any of the original peoples of the Far East, Southeast Asia, or the Indian Subcontinent."],
+          ["Black or African American", "A person having origins in any of the black racial groups of Africa."],
+          ["Native Hawaiian or Other Pacific Islander", "A person having origins in any of the original peoples of Hawaii, Guam, Samoa, or other Pacific Islands."],
+          ["White", "A person having origins in any of the original peoples of Europe, the Middle East, or North Africa."]
+        ]),
+        required: true
+      },
+      {
+        section: "demographic",
+        text: "What is your gender?",
+        type: "multiple-choice",
+        options: [
+          "Man",
+          "Woman",
+          "Non-binary",
+          "Genderqueer or gender non-conforming",
+          "Another identity not listed",
+          "I'd rather not say"
+        ],
+      },
+      {
+        section: "demographic",
+        text: "Do you identify as transgender?",
+        type: "multiple-choice",
+        options: [
+          "No",
+          "Yes",
+          "I'd rather not say"
+        ],
+      },
+      {
+        section: "demographic",
+        text: "Are you a first-generation college student?",
+        type: "boolean",
+      },
+      {
+        section: "demographic",
+        text: "Are you a Computer Science major?",
+        type: "boolean",
+      },
+      {
+        section: "demographic",
+        text: "If you stated that you are not a Computer Science major, please indicate your major",
+        type: "text",
+      },
 
       // Feedback
       {
@@ -409,4 +409,4 @@ export const defaultQuestions = [
         type: "text",
       },
 
-    ].map((question, index) => ({ ...question, id: index + 1 }));
+    ].map((question, index) => ({ ...question, id: index}));

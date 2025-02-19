@@ -21,9 +21,8 @@ const QuestionInterface = () => {
 
   const [dividerMessagesIndex, setDividerMessageIndex] = useState(0);
   const dividerMessages = [
-    "Background.",
-    "Questionaire.",
     "Parsons.",
+    "Background.",
     "Feedback.",
   ];
 
@@ -96,8 +95,8 @@ const QuestionInterface = () => {
       await stopEEGRecording(sessionId, currentQuestion.id);
 
       
-      // Set indicies for the divider here (background, questionaire, parsons, feedback)
-      const dividerIndices = new Set([3, 8, 10, 14]);
+      // Set indicies for the divider here (parsons, background, feedback)
+      const dividerIndices = new Set([32, 35, 42]);
       if (dividerIndices.has(currentQuestionIndex)) {
         setCurrentState("divider");
       }
@@ -359,7 +358,7 @@ const QuestionInterface = () => {
     <div className="w-full max-w-2xl mx-auto p-4">
       <div className="bg-white shadow-lg rounded-lg overflow-hidden">
         <div className="p-6">
-          <h2 className="text-2xl font-bold mb-4">Belonging Beyond Boundaries Study</h2>
+          <h2 className="text-2xl font-bold mb-4">Computer Science Study</h2>
           
           {currentState === 'answering' && questions.length > 0 && (
             <div className="mb-4 flex items-center justify-between">
