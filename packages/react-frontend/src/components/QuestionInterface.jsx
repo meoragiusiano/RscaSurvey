@@ -32,7 +32,19 @@ const QuestionInterface = () => {
       setIsLoading(true);
       try {
         const response = await axios.get(`${API_URL}/questions`);
-        setQuestions(response.data);
+        const allQuestions = response.data;
+        
+        const firstPart = allQuestions.slice(0, 23);
+        const remainingPart = allQuestions.slice(23);
+        
+        const shuffledFirst = [...firstPart];
+        for (let i = shuffledFirst.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffledFirst[i], shuffledFirst[j]] = [shuffledFirst[j], shuffledFirst[i]];
+        }
+        
+        const shuffledQuestions = [...shuffledFirst, ...remainingPart];
+        setQuestions(shuffledQuestions);
       } catch (err) {
         setError('Failed to load questions. Please check your connection.');
         console.error('Error fetching questions:', err);
