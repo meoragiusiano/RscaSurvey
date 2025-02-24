@@ -123,7 +123,7 @@ const QuestionInterface = () => {
       stopTimer();
 
       // Stop EEG recording for the current question
-      await stopEEGRecording(sessionId, currentQuestion.id);
+      // await stopEEGRecording(sessionId, currentQuestion.id);
 
       // Set indicies for the divider here (parsons, background, feedback)
       const dividerIndices = new Set([32, 35, 42]);
@@ -136,7 +136,7 @@ const QuestionInterface = () => {
         setQuestionStartTime(Date.now());
 
         // Start EEG recording for the next question
-        await startEEGRecording(sessionId, questions[currentQuestionIndex + 1].id);
+        // await startEEGRecording(sessionId, questions[currentQuestionIndex + 1].id);
         startTimer();
       } else {
         // Complete the session when there are no more questions
@@ -158,7 +158,7 @@ const QuestionInterface = () => {
       setQuestionStartTime(Date.now());
 
       // Start EEG recording for the first question
-      await startEEGRecording(response.data.sessionId, questions[0].id);
+      // await startEEGRecording(response.data.sessionId, questions[0].id);
       startTimer();
     } catch (err) {
       setError("Failed to start session. Please check your connection.");
@@ -419,7 +419,7 @@ const QuestionInterface = () => {
                 Please select your number
               </h2>
               <div className="flex flex-row items-center justify-between gap-4">
-              {[1, 2].map((number) => (
+              {[1, 2, 3].map((number) => (
                   <button
                     key={number}
                     onClick={() => {
