@@ -24,6 +24,7 @@ const QuestionInterface = () => {
   const dividerMessages = ["Parsons.", "Background.", "Feedback."];
 
   const [currentVignetteIndex, setCurrentVignetteIndex] = useState(0);
+  const [vignetteSelected, setVignetteSelected] = useState(false);
 
   const nextVignette = () => {
     setCurrentVignetteIndex((prevIndex) => {
@@ -405,7 +406,36 @@ const QuestionInterface = () => {
         <div className="p-6">
           <h2 className="text-2xl font-bold mb-4">Computer Science Study</h2>
 
-          {currentState === "vignette" && (
+          {currentState === "vignette" && vignetteSelected === false && (
+            <div className="mb-4 flex flex-col items-center justify-between">
+              <h2
+                style={{
+                  color: "black",
+                  fontSize: "24px",
+                  fontWeight: "medium",
+                  textAlign: "center",
+                }}
+              >
+                Please select your number
+              </h2>
+              <div className="flex flex-row items-center justify-between gap-4">
+              {[1, 2].map((number) => (
+                  <button
+                    key={number}
+                    onClick={() => {
+                      setVignetteSelected(true);
+                      setCurrentVignetteIndex(number - 1);
+                    }}
+                    className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
+                  >
+                    {number}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {currentState === "vignette" && vignetteSelected === true && (
             <div className="mb-4 flex flex-col items-center justify-between">
               <h2
                 style={{
@@ -428,21 +458,21 @@ const QuestionInterface = () => {
               </p>
               <div
                 style={{
-                  height: "500px", 
+                  height: "500px",
                   overflowY: "auto",
                   border: "1px solid #ccc",
                   padding: "10px",
-                  width: "100%", 
+                  width: "100%",
                   marginBottom: "20px",
                 }}
               >
                 {contents}
               </div>
               <button
-                onClick={nextVignette}
+                onClick={() => setCurrentState("answering")}  
                 className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
               >
-                Next Story
+                Ready to Start!
               </button>
             </div>
           )}
