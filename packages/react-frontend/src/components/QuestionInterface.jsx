@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Play, ChevronRight, AlertCircle } from "lucide-react";
+import { Play, AlertCircle } from "lucide-react";
 import axios from "axios";
 import ParsonsProblem from "./ParsonsProblem";
 import vignettes from "./vignettes";
@@ -17,11 +17,23 @@ const QuestionInterface = () => {
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
-  const QUESTION_TIME_LIMIT = 60000; // 60 seconds
+  const getQuestionTimeLimit = (index) => {
+    if (index >= 0 && index <= 31) {
+      return 10000; // 10 seconds for questions 0-31 (Belonging)
+    } else if (index >= 32 && index <= 34) {
+      return 60000; // 60 seconds for questions 32-34 (Parsons)
+    } else if (index >= 35 && index <= 41) {
+      return 10000; // 10 seconds for questions 35-34 (Background)
+    }else {
+      return 70000; // 70 seconds for the rest (Feedback)
+    }
+  };
+
   const timerRef = useRef(null);
+  const moveToNextQuestionRef = useRef(null);
 
   const [dividerMessagesIndex, setDividerMessageIndex] = useState(0);
-  const dividerMessages = ["Parsons.", "Background.", "Feedback."];
+  const dividerMessages = ["Quiz.", "Background.", "Feedback."];
 
   const [currentVignetteIndex, setCurrentVignetteIndex] = useState(0);
   const [vignetteSelected, setVignetteSelected] = useState(false);
@@ -71,20 +83,80 @@ const QuestionInterface = () => {
     fetchQuestions();
   }, []);
 
+  const moveToNextQuestion = useCallback(async () => {
+    if (!questions.length || currentQuestionIndex >= questions.length) return;
+    
+    const currentQuestion = questions[currentQuestionIndex];
+
+    try {
+      stopTimer();
+
+      // Save the current answer if it exists
+      const currentAnswer = answers[currentQuestion?.id]?.answer;
+      if (currentAnswer && sessionId && currentQuestion?.id) {
+        const timeSpent = Date.now() - questionStartTime;
+        await sendAnswerToDB(currentAnswer, timeSpent, currentQuestion.id);
+      }
+
+      // Stop EEG recording for the current question
+      if (sessionId && currentQuestion?.id) {
+        await stopEEGRecording(sessionId, currentQuestion.id);
+      }
+
+      // Set indices for the divider here (parsons, background, feedback)
+      const dividerIndices = new Set([32, 35, 42]);
+      if (dividerIndices.has(currentQuestionIndex)) {
+        setCurrentState("divider");
+        return; // Early return to prevent moving to next question yet
+      }
+
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex((prev) => prev + 1);
+        setQuestionStartTime(Date.now());
+
+        // Start EEG recording for the next question
+        if (sessionId && questions[currentQuestionIndex + 1]?.id) {
+          await startEEGRecording(sessionId, questions[currentQuestionIndex + 1].id);
+        }
+        startTimer();
+      } else {
+        // Complete the session when there are no more questions
+        if (sessionId) {
+          await axios.post(`${API_URL}/sessions/${sessionId}/complete`);
+        }
+        setCurrentState("completed");
+      }
+    } catch (err) {
+      setError("Failed to move to the next question. Please try again.");
+      console.error("Error moving to the next question:", err);
+    }
+  }, [currentQuestionIndex, questions, sessionId, answers, questionStartTime]);
+
+  // Store the latest version of moveToNextQuestion in a ref
+  useEffect(() => {
+    moveToNextQuestionRef.current = moveToNextQuestion;
+  }, [moveToNextQuestion]);
+  
   const startTimer = useCallback(() => {
     const startTime = Date.now();
+    const currentTimeLimit = getQuestionTimeLimit(currentQuestionIndex);
+    
+    setTimeRemaining(currentTimeLimit);
+    
     timerRef.current = setInterval(() => {
       const elapsed = Date.now() - startTime;
-      const remaining = Math.max(QUESTION_TIME_LIMIT - elapsed, 0);
+      const remaining = Math.max(currentTimeLimit - elapsed, 0);
 
       setTimeRemaining(remaining);
 
       if (remaining <= 0) {
         clearInterval(timerRef.current);
-        moveToNextQuestion();
+        if (moveToNextQuestionRef.current) {
+          moveToNextQuestionRef.current();
+        }
       }
     }, 100);
-  }, []);
+  }, [currentQuestionIndex]);
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
@@ -116,50 +188,12 @@ const QuestionInterface = () => {
     }
   };
 
-  const moveToNextQuestion = useCallback(async () => {
-    const currentQuestion = questions[currentQuestionIndex];
-
-    try {
-      stopTimer();
-
-      // Stop EEG recording for the current question
-      await stopEEGRecording(sessionId, currentQuestion.id);
-
-      // Set indicies for the divider here (parsons, background, feedback)
-      const dividerIndices = new Set([32, 35, 42]);
-      if (dividerIndices.has(currentQuestionIndex)) {
-        setCurrentState("divider");
-      }
-
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex((prev) => prev + 1);
-        setQuestionStartTime(Date.now());
-
-        // Start EEG recording for the next question
-        await startEEGRecording(sessionId, questions[currentQuestionIndex + 1].id);
-        startTimer();
-      } else {
-        // Complete the session when there are no more questions
-        await axios.post(`${API_URL}/sessions/${sessionId}/complete`);
-        setCurrentState("completed");
-      }
-    } catch (err) {
-      setError("Failed to move to the next question. Please try again.");
-      console.error("Error moving to the next question:", err);
-    }
-  }, [currentQuestionIndex, questions, sessionId, stopTimer, startTimer]);
-
   const startQuestionnaire = async () => {
     setIsLoading(true);
     try {
       const response = await axios.post(`${API_URL}/sessions`);
       setSessionId(response.data.sessionId);
-      setCurrentState("vignette"); // adjust as needed
-      setQuestionStartTime(Date.now());
-
-      // Start EEG recording for the first question
-      await startEEGRecording(response.data.sessionId, questions[0].id);
-      startTimer();
+      setCurrentState("vignette");
     } catch (err) {
       setError("Failed to start session. Please check your connection.");
       console.error("Error starting session:", err);
@@ -169,32 +203,16 @@ const QuestionInterface = () => {
   };
 
   const handleAnswer = async (answer) => {
-    const currentTime = Date.now();
-    const timeSpent = currentTime - questionStartTime;
     const currentQuestion = questions[currentQuestionIndex];
 
-    setAnswers((prev) => ({
-      ...prev,
-      [currentQuestion.id]: {
-        answer,
-        timeSpent,
-      },
-    }));
-  };
-
-  const handleNextClick = async () => {
-    const currentTime = Date.now();
-    const timeSpent = currentTime - questionStartTime;
-    const currentQuestion = questions[currentQuestionIndex];
-
-    if (timeSpent <= QUESTION_TIME_LIMIT) {
-      const currentAnswer = answers[currentQuestion.id]?.answer;
-
-      if (currentAnswer) {
-        await sendAnswerToDB(currentAnswer, timeSpent, currentQuestion.id);
-      }
-
-      moveToNextQuestion();
+    if (currentQuestion) {
+      setAnswers((prev) => ({
+        ...prev,
+        [currentQuestion.id]: {
+          answer,
+          timeSpent: Date.now() - questionStartTime,
+        },
+      }));
     }
   };
 
@@ -229,11 +247,13 @@ const QuestionInterface = () => {
     setQuestionStartTime(null);
     setSessionId(null);
     setError(null);
-    setTimeRemaining(QUESTION_TIME_LIMIT);
+    setTimeRemaining(getQuestionTimeLimit(0));
   };
 
   const renderQuestionInput = () => {
     const currentQuestion = questions[currentQuestionIndex];
+    if (!currentQuestion) return null;
+    
     const currentAnswer = answers[currentQuestion.id]?.answer || "";
 
     switch (currentQuestion.type) {
@@ -359,7 +379,13 @@ const QuestionInterface = () => {
         <button
           onClick={() => {
             setCurrentState("answering");
-            setDividerMessageIndex(dividerMessagesIndex + 1);
+            setDividerMessageIndex((prevIndex) => prevIndex + 1);
+            setCurrentQuestionIndex((prevIndex) => prevIndex + 1);
+            setQuestionStartTime(Date.now());
+            if (sessionId && questions[currentQuestionIndex + 1]?.id) {
+              startEEGRecording(sessionId, questions[currentQuestionIndex + 1].id);
+            }
+            startTimer();
           }}
           className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
           aria-label="Continue Questionnaire"
@@ -399,6 +425,12 @@ const QuestionInterface = () => {
       </div>
     );
   }
+
+  // Format time remaining for display
+  const formatTimeRemaining = (ms) => {
+    const seconds = Math.ceil(ms / 1000);
+    return `${seconds}s`;
+  };
 
   return (
     <div className="w-full max-w-2xl mx-auto p-4">
@@ -469,7 +501,16 @@ const QuestionInterface = () => {
                 {contents}
               </div>
               <button
-                onClick={() => setCurrentState("answering")}  
+                onClick={() => {
+                  setCurrentState("answering");
+                  
+                  // Start the timer and EEG recording for the first question here
+                  setQuestionStartTime(Date.now());
+                  if (sessionId && questions[0]?.id) {
+                    startEEGRecording(sessionId, questions[0].id);
+                  }
+                  startTimer();
+                }}  
                 className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
               >
                 Ready to Start!
@@ -481,6 +522,9 @@ const QuestionInterface = () => {
             <div className="mb-4 flex items-center justify-between">
               <div className="text-sm text-gray-500">
                 Question {currentQuestionIndex + 1} of {questions.length}
+              </div>
+              <div className="text-sm font-medium text-gray-500">
+                {/* Time: {formatTimeRemaining(timeRemaining)} */}
               </div>
             </div>
           )}
@@ -508,25 +552,9 @@ const QuestionInterface = () => {
             <div className="space-y-6">
               <div className="space-y-4">
                 <h3 className="text-lg font-medium">
-                  {questions[currentQuestionIndex].text}
+                  {questions[currentQuestionIndex]?.text}
                 </h3>
                 {renderQuestionInput()}
-                <div className="flex justify-end">
-                  <button
-                    onClick={handleNextClick}
-                    className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center gap-2"
-                    aria-label={
-                      currentQuestionIndex < questions.length - 1
-                        ? "Next Question"
-                        : "Complete Questionnaire"
-                    }
-                  >
-                    {currentQuestionIndex < questions.length - 1
-                      ? "Next"
-                      : "Complete"}
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
               </div>
             </div>
           )}
