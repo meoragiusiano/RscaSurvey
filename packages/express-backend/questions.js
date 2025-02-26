@@ -239,65 +239,83 @@ export const defaultQuestions = [
       // Parsons Problem Questions
       {
         section: "parsons",
-        text: "Rearrange the following code blocks to define a function that adds two numbers and then use the function to add the numbers 5 and 10.",
+        text: "Create a program that iterates over a list of fruits and prints each fruit.",
         type: "parsons-problem",
         options: [
-          "return total",
-          "total = a + b",
-          "a = 5",
-          "my_add(a, b)",
-          "def my_add(a, b):",
-          "b = 10"
+          "my_list = [\"apple\", \"banana\", \"cherry\"]",
+          "print(fruit)",
+          "for fruit in my_list:"
         ],
         correctOrder: [
-          "def my_add(a,b):",
-          "total = a+b",
-          "return total",
-          "a = 5",
-          "b = 10",
-          "my_add(a,b)"
+          "my_list = [\"apple\", \"banana\", \"cherry\"]",
+          "for fruit in my_list:",
+          "print(fruit)"
         ],
         required: true
       },
       {
         section: "parsons",
-        text: "Rearrange the following code blocks to create a Python program that calculates the area of a rectangle. The width of the rectangle is 5 units and the height is 10 units.",
+        text: "Given a list of numbers, create a new list that contains only the even numbers using a for loop and an if statement. Finally, print the new list.",
         type: "parsons-problem",
         options: [
-          "area = width * height",
-          "width = 5",
-          "height = 10",
-          "print('The area of the rectangle is: ', area)"
+          "nums = [1, 2, 3, 4, 5, 6]",
+          "even_nums.append(num)",
+          "for num in nums:",
+          "even_nums = []",
+          "if num % 2 == 0:",
+          "print(even_nums)"
         ],
         correctOrder: [
-          "width = 5",
-          "height = 10",
-          "area = width * height",
-          "print('The area of the rectangle is: ', area)"
+          "nums = [1, 2, 3, 4, 5, 6]",
+          "even_nums = []",
+          "for num in nums:",
+          "if num % 2 == 0:",
+          "even_nums.append(num)",
+          "print(even_nums)"
         ],
         required: true
       },
       {
         section: "parsons",
-        text: "Rearrange the following code blocks to implement a Python program that checks if a number is positive, negative, or zero. The number to test is -3.",
+        text: "Using a while loop, iterate over the list and print each element.",
         type: "parsons-problem",
         options: [
-          "print('Positive')",
-          "number = -3",
-          "elif number == 0:",
+          "items = [\"a\", \"b\", \"c\", \"d\"]",
+          "while i < len(items):",
+          "i = 0",
           "else:",
-          "print('Zero')",
-          "if number > 0:",
-          "print('Negative')"
+          "print(items[i])",
+          "i += 1"
         ],
         correctOrder: [
-          "number = -3",
-          "if number > 0:",
-          "print('Positive')",
+          "items = [\"a\", \"b\", \"c\", \"d\"]",
+          "i = 0",
+          "while i < len(items):",
           "elif number == 0:",
-          "print('Zero')",
-          "else:",
-          "print('Negative')"
+          "print(items[i])",
+          "i += 1"
+        ],
+        required: true
+      },  
+      {
+        section: "parsons",
+        text: "Write a program that counts how many times the word \"apple\" appears in a list of words, then prints the count.",
+        type: "parsons-problem",
+        options: [
+          "words = [\"apple\", \"banana\", \"apple\", \"cherry\", \"apple\"]",
+          "for word in words:",
+          "count = 0",
+          "if word == \"apple\":",
+          "count += 1",
+          "print(count)"
+        ],
+        correctOrder: [
+          "words = [\"apple\", \"banana\", \"apple\", \"cherry\", \"apple\"]",
+          "for word in words:",
+          "count = 0",
+          "if word == \"apple\":",
+          "count += 1",
+          "print(count)"
         ],
         required: true
       },  

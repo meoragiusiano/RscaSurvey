@@ -38,16 +38,6 @@ const QuestionInterface = () => {
   const [currentVignetteIndex, setCurrentVignetteIndex] = useState(0);
   const [vignetteSelected, setVignetteSelected] = useState(false);
 
-  const nextVignette = () => {
-    setCurrentVignetteIndex((prevIndex) => {
-      const nextIndex = (prevIndex + 1) % vignettes.length;
-      if (nextIndex === 0) {
-        setCurrentState("answering"); // adjust as needed
-      }
-      return nextIndex;
-    });
-  };
-
   const { title, author, contents } = vignettes[currentVignetteIndex];
 
   // Fetch questions on component mount
@@ -452,17 +442,40 @@ const QuestionInterface = () => {
               </h2>
               <div className="flex flex-row items-center justify-between gap-4">
               {[1, 2, 3].map((number) => (
-                  <button
-                    key={number}
-                    onClick={() => {
-                      setVignetteSelected(true);
-                      setCurrentVignetteIndex(number - 1);
-                    }}
-                    className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
-                  >
-                    {number}
-                  </button>
-                ))}
+                <button
+                  key={number}
+                  onClick={() => {
+                    setVignetteSelected(true);
+                    setCurrentVignetteIndex(number - 1);
+
+                    // Start EEG recording for the vignette
+                    if (sessionId) {
+                      startEEGRecording(sessionId, 100);
+                    }
+
+                    // Store the question start time
+                    setQuestionStartTime(Date.now());
+
+                    // Wait 100 seconds before stopping EEG and transitioning state
+                    setTimeout(() => {
+                      if (sessionId) {
+                        stopEEGRecording(sessionId, 100);
+                      }
+                      setCurrentState("answering");
+
+                      // Start EEG for the first question
+                      if (sessionId && questions[0]?.id) {
+                        startEEGRecording(sessionId, questions[0].id);
+                      }
+                      startTimer();
+                    }, 100000); // 100 seconds
+
+                  }}
+                  className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
+                >
+                  {number}
+                </button>
+              ))}
               </div>
             </div>
           )}
@@ -500,21 +513,6 @@ const QuestionInterface = () => {
               >
                 {contents}
               </div>
-              <button
-                onClick={() => {
-                  setCurrentState("answering");
-                  
-                  // Start the timer and EEG recording for the first question here
-                  setQuestionStartTime(Date.now());
-                  if (sessionId && questions[0]?.id) {
-                    startEEGRecording(sessionId, questions[0].id);
-                  }
-                  startTimer();
-                }}  
-                className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
-              >
-                Ready to Start!
-              </button>
             </div>
           )}
 

@@ -136,7 +136,9 @@ let recordingProcess = null;
 app.post('/api/sessions/:sessionId/questions/:questionId/start-eeg', async (req, res) => {
   try {
     const { sessionId, questionId } = req.params;
-    
+    console.log(`Starting EEG for Question: ${questionId}`);
+
+
     if (recordingProcess) {
       recordingProcess.kill();
       recordingProcess = null;
@@ -174,6 +176,7 @@ app.post('/api/sessions/:sessionId/questions/:questionId/start-eeg', async (req,
 app.post('/api/sessions/:sessionId/questions/:questionId/stop-eeg', async (req, res) => {
   try {
     const { sessionId, questionId } = req.params;
+    console.log(`Stopping EEG for Question: ${questionId}`);
 
     if (!recordingProcess) {
       return res.status(400).json({ message: 'No EEG recording in progress.' });
