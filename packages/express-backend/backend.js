@@ -74,6 +74,14 @@ const responseSchema = new mongoose.Schema({
     required: true
   },
   endTime: Date,
+  surveyType: {
+    type: Number,
+    enum: [1, 2], // 1 = with Parsons, 2 = without Parsons
+  },
+  vignetteType: {
+    type: String,
+    enum: ['fixed', 'growth', 'control'], // Maps to vignette selection F, G, C
+  },
   backgroundProfile: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'BackgroundProfile'
@@ -415,6 +423,31 @@ app.get('/api/background-profiles/stats', async (req, res) => {
   } catch (error) {
     console.error('Error getting background profile stats:', error);
     res.status(500).json({ message: 'Error getting statistics' });
+  }
+});
+
+app.put('/api/sessions/:sessionId', async (req, res) => {
+  try {
+    const { surveyType, vignetteType } = req.body;
+    const session = await Response.findOne({ sessionId: req.params.sessionId });
+
+    if (!session) {
+      return res.status(404).json({ message: 'Session not found' });
+    }
+
+    if (surveyType !== undefined) {
+      session.surveyType = surveyType;
+    }
+    
+    if (vignetteType !== undefined) {
+      session.vignetteType = vignetteType;
+    }
+
+    await session.save();
+    res.json(session);
+  } catch (error) {
+    console.error('Error updating session:', error);
+    res.status(400).json({ message: 'Error updating session' });
   }
 });
 

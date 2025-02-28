@@ -20,13 +20,13 @@ const QuestionInterface = () => {
 
   const getQuestionTimeLimit = (index) => {
     if (index >= 0 && index <= 31) {
-      return 900; // 10 seconds for questions 0-31 (Belonging)
+      return 10000; // 10 seconds for questions 0-31 (Belonging)
     } else if (index >= 32 && index <= 34) {
-      return 900; // 60 seconds for questions 32-34 (Parsons)
+      return 60000; // 60 seconds for questions 32-34 (Parsons)
     } else if (index >= 35 && index <= 42) {
-      return 900; // 10 seconds for questions 35-34 (Background)
+      return 10000; // 10 seconds for questions 35-34 (Background)
     }else {
-      return 900; // 70 seconds for the rest (Feedback)
+      return 70000; // 70 seconds for the rest (Feedback)
     }
   };
 
@@ -480,6 +480,15 @@ const QuestionInterface = () => {
                   onClick={() => {
                     setStudyType(1); // Normal flow with Parsons
                     setCurrentState("vignette");
+                    
+                    // Update the session with the study type information
+                    if (sessionId) {
+                      axios.put(`${API_URL}/sessions/${sessionId}`, { 
+                        surveyType: 1 
+                      }).catch(err => {
+                        console.error("Error updating session with survey type:", err);
+                      });
+                    }
                   }}
                   className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
                 >
@@ -489,6 +498,15 @@ const QuestionInterface = () => {
                   onClick={() => {
                     setStudyType(2); // Without Parsons
                     setCurrentState("vignette");
+                    
+                    // Update the session with the study type information
+                    if (sessionId) {
+                      axios.put(`${API_URL}/sessions/${sessionId}`, { 
+                        surveyType: 2 
+                      }).catch(err => {
+                        console.error("Error updating session with survey type:", err);
+                      });
+                    }
                   }}
                   className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
                 >
@@ -508,17 +526,27 @@ const QuestionInterface = () => {
                   textAlign: "center",
                 }}
               >
-                Please select your assigned Number
+                Please select your assigned letter
               </h2>
               <div className="flex flex-row items-center justify-between gap-4">
               {["F", "G", "C"].map((letter) => (
                 <button
                   key={letter}
                   onClick={() => {
-                    const vignetteMap = {"F": 0, "G": 1, "C": 2}
-                    const vignetteLetterIndex = vignetteMap[letter]
+                    const vignetteMap = {"F": 0, "G": 1, "C": 2};
+                    const vignetteTypeMap = {"F": "fixed", "G": "growth", "C": "control"};
+                    const vignetteLetterIndex = vignetteMap[letter];
                     setVignetteSelected(true);
                     setCurrentVignetteIndex(vignetteLetterIndex);
+
+                    // Update the session with the vignette type information
+                    if (sessionId) {
+                      axios.put(`${API_URL}/sessions/${sessionId}`, { 
+                        vignetteType: vignetteTypeMap[letter] 
+                      }).catch(err => {
+                        console.error("Error updating session with vignette type:", err);
+                      });
+                    }
 
                     // Start EEG recording for the vignette
                     if (sessionId) {
@@ -540,8 +568,7 @@ const QuestionInterface = () => {
                         startEEGRecording(sessionId, questions[0].id);
                       }
                       startTimer();
-                    }, 900); // 100 seconds
-
+                    }, 100000); // 100 seconds
                   }}
                   className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
                 >

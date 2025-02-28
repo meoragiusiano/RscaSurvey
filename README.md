@@ -3,9 +3,12 @@
 2 -- Study without Parsons questions
 
 ### Vignettes:
-1 -- Fixed
-2 -- Growth
-3 -- Control
+F -- Fixed
+G -- Growth
+C -- Control
 
 ### Times
-
+Vignette -- 100s
+Belonging & Background -- 10s each
+Parsons -- 1min each
+Feedback -- 70s each
