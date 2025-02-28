@@ -494,12 +494,14 @@ const QuestionInterface = () => {
                 Please select your number
               </h2>
               <div className="flex flex-row items-center justify-between gap-4">
-              {[1, 2, 3].map((number) => (
+              {["F", "G", "C"].map((letter) => (
                 <button
-                  key={number}
+                  key={letter}
                   onClick={() => {
+                    const vignetteMap = {"F": 0, "G": 1, "C": 2}
+                    const vignetteLetterIndex = vignetteMap[letter]
                     setVignetteSelected(true);
-                    setCurrentVignetteIndex(number - 1);
+                    setCurrentVignetteIndex(vignetteLetterIndex);
 
                     // Start EEG recording for the vignette
                     if (sessionId) {
@@ -526,7 +528,7 @@ const QuestionInterface = () => {
                   }}
                   className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
                 >
-                  {number}
+                  {letter}
                 </button>
               ))}
               </div>
