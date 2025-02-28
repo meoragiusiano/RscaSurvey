@@ -16,14 +16,15 @@ const QuestionInterface = () => {
   const [error, setError] = useState(null);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
+  const [studyType, setStudyType] = useState(null); // 1 = normal, 2 = without Parsons
 
   const getQuestionTimeLimit = (index) => {
     if (index >= 0 && index <= 31) {
-      return 10000; // 10 seconds for questions 0-31 (Belonging)
+      return 3000; // 10 seconds for questions 0-31 (Belonging)
     } else if (index >= 32 && index <= 34) {
-      return 60000; // 60 seconds for questions 32-34 (Parsons)
-    } else if (index >= 35 && index <= 41) {
-      return 10000; // 10 seconds for questions 35-34 (Background)
+      return 5000; // 60 seconds for questions 32-34 (Parsons)
+    } else if (index >= 35 && index <= 42) {
+      return 3000; // 10 seconds for questions 35-34 (Background)
     }else {
       return 70000; // 70 seconds for the rest (Feedback)
     }
@@ -93,8 +94,23 @@ const QuestionInterface = () => {
         await stopEEGRecording(sessionId, currentQuestion.id);
       }
 
+      // If study type is 2 (no Parsons) and we're about to hit Parsons questions, skip them
+      if (studyType === 2) {
+        // Check if we're about to hit Parsons section
+        if (currentQuestionIndex === 31) {
+          // Skip to question 37 (Background section)
+          setCurrentQuestionIndex(36);
+          setDividerMessageIndex(1); // Set to "Background." divider message
+          setCurrentState("divider");
+          return;
+        }
+      }
+
       // Set indices for the divider here (parsons, background, feedback)
-      const dividerIndices = new Set([32, 35, 42]);
+      const dividerIndices = studyType === 1 
+                            ? new Set([32, 35, 42]) 
+                            : new Set([35, 42]);
+                            
       if (dividerIndices.has(currentQuestionIndex)) {
         setCurrentState("divider");
         return; // Early return to prevent moving to next question yet
@@ -120,7 +136,7 @@ const QuestionInterface = () => {
       setError("Failed to move to the next question. Please try again.");
       console.error("Error moving to the next question:", err);
     }
-  }, [currentQuestionIndex, questions, sessionId, answers, questionStartTime]);
+  }, [currentQuestionIndex, questions, sessionId, answers, questionStartTime, studyType]);
 
   // Store the latest version of moveToNextQuestion in a ref
   useEffect(() => {
@@ -183,7 +199,7 @@ const QuestionInterface = () => {
     try {
       const response = await axios.post(`${API_URL}/sessions`);
       setSessionId(response.data.sessionId);
-      setCurrentState("vignette");
+      setCurrentState("studySelection");
     } catch (err) {
       setError("Failed to start session. Please check your connection.");
       console.error("Error starting session:", err);
@@ -238,6 +254,7 @@ const QuestionInterface = () => {
     setSessionId(null);
     setError(null);
     setTimeRemaining(getQuestionTimeLimit(0));
+    setStudyType(null);
   };
 
   const renderQuestionInput = () => {
@@ -427,6 +444,42 @@ const QuestionInterface = () => {
       <div className="bg-white shadow-lg rounded-lg overflow-hidden">
         <div className="p-6">
           <h2 className="text-2xl font-bold mb-4">Computer Science Study</h2>
+
+          {currentState === "studySelection" && (
+            <div className="mb-4 flex flex-col items-center justify-between">
+              <h2
+                style={{
+                  color: "black",
+                  fontSize: "24px",
+                  fontWeight: "medium",
+                  textAlign: "center",
+                  marginBottom: "20px"
+                }}
+              >
+                Please select your study type
+              </h2>
+              <div className="flex flex-row items-center justify-between gap-4">
+                <button
+                  onClick={() => {
+                    setStudyType(1); // Normal flow with Parsons
+                    setCurrentState("vignette");
+                  }}
+                  className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
+                >
+                  1
+                </button>
+                <button
+                  onClick={() => {
+                    setStudyType(2); // Without Parsons
+                    setCurrentState("vignette");
+                  }}
+                  className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
+                >
+                  2
+                </button>
+              </div>
+            </div>
+          )}
 
           {currentState === "vignette" && vignetteSelected === false && (
             <div className="mb-4 flex flex-col items-center justify-between">
