@@ -20,13 +20,13 @@ const QuestionInterface = () => {
 
   const getQuestionTimeLimit = (index) => {
     if (index >= 0 && index <= 31) {
-      return 3000; // 10 seconds for questions 0-31 (Belonging)
+      return 900; // 10 seconds for questions 0-31 (Belonging)
     } else if (index >= 32 && index <= 34) {
-      return 5000; // 60 seconds for questions 32-34 (Parsons)
+      return 900; // 60 seconds for questions 32-34 (Parsons)
     } else if (index >= 35 && index <= 42) {
-      return 3000; // 10 seconds for questions 35-34 (Background)
+      return 900; // 10 seconds for questions 35-34 (Background)
     }else {
-      return 70000; // 70 seconds for the rest (Feedback)
+      return 900; // 70 seconds for the rest (Feedback)
     }
   };
 
@@ -34,7 +34,22 @@ const QuestionInterface = () => {
   const moveToNextQuestionRef = useRef(null);
 
   const [dividerMessagesIndex, setDividerMessageIndex] = useState(0);
-  const dividerMessages = ["Quiz.", "Background.", "Feedback."];
+  const dividerMessages = [
+    "Quiz.",
+    "Solution: Problem 1: Iterating Over a List\n\n" +
+      "A. my_list = [\"apple\", \"banana\", \"cherry\"]\n" +
+      "C. for fruit in my_list:\n" +
+      "  B. print(fruit)\n\n" +
+      "Solution: Problem 2: Filtering Even Numbers\n\n" +
+      "A. nums = [1, 2, 3, 4, 5, 6]\n" +
+      "D. even_nums = []\n" +
+      "C. for num in nums:\n" +
+      "  E. if num % 2 == 0:\n" +
+      "    B. even_nums.append(num)\n" +
+      "F. print(even_nums)\n",
+    "Background.",
+    "Feedback."
+  ];
 
   const [currentVignetteIndex, setCurrentVignetteIndex] = useState(0);
   const [vignetteSelected, setVignetteSelected] = useState(false);
@@ -98,9 +113,9 @@ const QuestionInterface = () => {
       if (studyType === 2) {
         // Check if we're about to hit Parsons section
         if (currentQuestionIndex === 31) {
-          // Skip to question 37 (Background section)
-          setCurrentQuestionIndex(36);
-          setDividerMessageIndex(1); // Set to "Background." divider message
+          // Skip to question 39 (Background section)
+          setCurrentQuestionIndex(38);
+          setDividerMessageIndex(2); // Set to "Background." divider message
           setCurrentState("divider");
           return;
         }
@@ -108,7 +123,7 @@ const QuestionInterface = () => {
 
       // Set indices for the divider here (parsons, background, feedback)
       const dividerIndices = studyType === 1 
-                            ? new Set([32, 35, 42]) 
+                            ? new Set([32, 34, 38, 42]) 
                             : new Set([35, 42]);
                             
       if (dividerIndices.has(currentQuestionIndex)) {
@@ -249,6 +264,8 @@ const QuestionInterface = () => {
     stopTimer();
     setCurrentState("ready");
     setCurrentQuestionIndex(0);
+    setVignetteSelected(false);
+    setCurrentVignetteIndex(0);
     setAnswers({});
     setQuestionStartTime(null);
     setSessionId(null);
@@ -382,7 +399,7 @@ const QuestionInterface = () => {
     const currentMessage = dividerMessages[dividerMessagesIndex];
     return (
       <div className="text-center py-8 space-y-4">
-        <p className="text-gray-600">{currentMessage}</p>
+        <p className="text-gray-600 whitespace-pre-wrap break-words">{currentMessage}</p>
         <button
           onClick={() => {
             setCurrentState("answering");
@@ -491,7 +508,7 @@ const QuestionInterface = () => {
                   textAlign: "center",
                 }}
               >
-                Please select your number
+                Please select your assigned Number
               </h2>
               <div className="flex flex-row items-center justify-between gap-4">
               {["F", "G", "C"].map((letter) => (
@@ -523,7 +540,7 @@ const QuestionInterface = () => {
                         startEEGRecording(sessionId, questions[0].id);
                       }
                       startTimer();
-                    }, 100000); // 100 seconds
+                    }, 900); // 100 seconds
 
                   }}
                   className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
