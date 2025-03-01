@@ -318,8 +318,45 @@ export const defaultQuestions = [
           "print(count)"
         ],
         required: true
-      },  
-      
+      },    {
+        section: "parsons",
+        text: "Create a program that iterates over a list of fruits and prints each fruit.",
+        type: "parsons-problem",
+        options: [
+          "my_list = [\"apple\", \"banana\", \"cherry\"]",
+          "print(fruit)",
+          "for fruit in my_list:"
+        ],
+        correctOrder: [
+          "my_list = [\"apple\", \"banana\", \"cherry\"]",
+          "for fruit in my_list:",
+          "print(fruit)"
+        ],
+        required: true
+      }, 
+      // Repeat Questions
+      {
+        section: "parsons",
+        text: "Given a list of numbers, create a new list that contains only the even numbers using a for loop and an if statement. Finally, print the new list.",
+        type: "parsons-problem",
+        options: [
+          "nums = [1, 2, 3, 4, 5, 6]",
+          "even_nums.append(num)",
+          "for num in nums:",
+          "even_nums = []",
+          "if num % 2 == 0:",
+          "print(even_nums)"
+        ],
+        correctOrder: [
+          "nums = [1, 2, 3, 4, 5, 6]",
+          "even_nums = []",
+          "for num in nums:",
+          "if num % 2 == 0:",
+          "even_nums.append(num)",
+          "print(even_nums)"
+        ],
+        required: true
+      },
       // Demographic Information
       {
         section: "demographic",
