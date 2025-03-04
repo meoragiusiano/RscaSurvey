@@ -23,9 +23,9 @@ const QuestionInterface = () => {
     if (index >= 0 && index <= 31) {
       return 10000; // 10 seconds for questions 0-31 (Belonging)
     } else if (index >= 32 && index <= 38) {
-      return 80000; // 80 seconds for questions 32-38 (Parsons)
+      return 80000; // 80 seconds for questions 32-39 (Parsons)
     } else if (index >= 39 && index <= 45) {
-      return 15000; // 15 seconds for questions 39-42 (Background)
+      return 15000; // 15 seconds for questions 40-44 (Background)
     }else {
       return 70000; // 70 seconds for the rest (Feedback)
     }
