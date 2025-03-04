@@ -6,6 +6,7 @@ import vignettes from "./vignettes";
 
 const API_URL = "http://localhost:8000/api";
 
+
 const QuestionInterface = () => {
   const [currentState, setCurrentState] = useState("ready");
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -89,6 +90,10 @@ const QuestionInterface = () => {
     fetchQuestions();
   }, []);
 
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
   const moveToNextQuestion = useCallback(async () => {
     if (!questions.length || currentQuestionIndex >= questions.length) return;
     
@@ -108,6 +113,8 @@ const QuestionInterface = () => {
       if (sessionId && currentQuestion?.id) {
         await stopEEGRecording(sessionId, currentQuestion.id);
       }
+
+      await delay(2000);  // Waits for 2 seconds so stopping occurs before starting next question
 
       // If study type is 2 (no Parsons) and we're about to hit Parsons questions, skip them
       if (studyType === 2) {
@@ -555,20 +562,21 @@ const QuestionInterface = () => {
 
                     // Store the question start time
                     setQuestionStartTime(Date.now());
-
                     // Wait 100 seconds before stopping EEG and transitioning state
                     setTimeout(() => {
                       if (sessionId) {
                         stopEEGRecording(sessionId, 100);
                       }
-                      setCurrentState("answering");
 
-                      // Start EEG for the first question
-                      if (sessionId && questions[0]?.id) {
-                        startEEGRecording(sessionId, questions[0].id);
-                      }
-                      startTimer();
-                    }, 100000); // 100 seconds
+                      // Wait 2 seconds before starting the EEG for the first question
+                      setTimeout(() => {
+                        setCurrentState("answering");
+                        if (sessionId && questions[0]?.id) {
+                          startEEGRecording(sessionId, questions[0].id);
+                        }
+                        startTimer();
+                      }, 2000); // 2-second delay
+                    }, 100000); // 100-second delay
                   }}
                   className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
                 >
