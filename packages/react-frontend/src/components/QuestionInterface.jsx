@@ -22,10 +22,10 @@ const QuestionInterface = () => {
   const getQuestionTimeLimit = (index) => {
     if (index >= 0 && index <= 31) {
       return 10000; // 10 seconds for questions 0-31 (Belonging)
-    } else if (index >= 32 && index <= 34) {
-      return 60000; // 60 seconds for questions 32-34 (Parsons)
-    } else if (index >= 35 && index <= 42) {
-      return 10000; // 10 seconds for questions 35-34 (Background)
+    } else if (index >= 32 && index <= 38) {
+      return 80000; // 80 seconds for questions 32-38 (Parsons)
+    } else if (index >= 39 && index <= 45) {
+      return 15000; // 15 seconds for questions 39-42 (Background)
     }else {
       return 70000; // 70 seconds for the rest (Feedback)
     }
@@ -114,6 +114,7 @@ const QuestionInterface = () => {
         await stopEEGRecording(sessionId, currentQuestion.id);
       }
 
+      console.log("2 Seconds Waited");
       await delay(2000);  // Waits for 2 seconds so stopping occurs before starting next question
 
       // If study type is 2 (no Parsons) and we're about to hit Parsons questions, skip them
@@ -570,6 +571,7 @@ const QuestionInterface = () => {
 
                       // Wait 2 seconds before starting the EEG for the first question
                       setTimeout(() => {
+                        console.log("2 Seconds Waited");
                         setCurrentState("answering");
                         if (sessionId && questions[0]?.id) {
                           startEEGRecording(sessionId, questions[0].id);
