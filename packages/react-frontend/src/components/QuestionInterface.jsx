@@ -6,6 +6,7 @@ import vignettes from "./vignettes";
 
 const API_URL = "http://localhost:8000/api";
 
+
 const QuestionInterface = () => {
   const [currentState, setCurrentState] = useState("ready");
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -21,10 +22,10 @@ const QuestionInterface = () => {
   const getQuestionTimeLimit = (index) => {
     if (index >= 0 && index <= 31) {
       return 10000; // 10 seconds for questions 0-31 (Belonging)
-    } else if (index >= 32 && index <= 34) {
-      return 60000; // 60 seconds for questions 32-34 (Parsons)
-    } else if (index >= 35 && index <= 42) {
-      return 10000; // 10 seconds for questions 35-34 (Background)
+    } else if (index >= 32 && index <= 37) {
+      return 80000; // 80 seconds for questions 32-39 (Parsons)
+    } else if (index >= 38 && index <= 45) {
+      return 20000; // 15 seconds for questions 40-44 (Background)
     }else {
       return 70000; // 70 seconds for the rest (Feedback)
     }
@@ -89,6 +90,10 @@ const QuestionInterface = () => {
     fetchQuestions();
   }, []);
 
+  function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
   const moveToNextQuestion = useCallback(async () => {
     if (!questions.length || currentQuestionIndex >= questions.length) return;
     
@@ -108,6 +113,9 @@ const QuestionInterface = () => {
       if (sessionId && currentQuestion?.id) {
         await stopEEGRecording(sessionId, currentQuestion.id);
       }
+
+      console.log("2 Seconds Waited");
+      await delay(2000);  // Waits for 2 seconds so stopping occurs before starting next question
 
       // If study type is 2 (no Parsons) and we're about to hit Parsons questions, skip them
       if (studyType === 2) {
@@ -555,20 +563,22 @@ const QuestionInterface = () => {
 
                     // Store the question start time
                     setQuestionStartTime(Date.now());
-
                     // Wait 100 seconds before stopping EEG and transitioning state
                     setTimeout(() => {
                       if (sessionId) {
                         stopEEGRecording(sessionId, 100);
                       }
-                      setCurrentState("answering");
 
-                      // Start EEG for the first question
-                      if (sessionId && questions[0]?.id) {
-                        startEEGRecording(sessionId, questions[0].id);
-                      }
-                      startTimer();
-                    }, 100000); // 100 seconds
+                      // Wait 2 seconds before starting the EEG for the first question
+                      setTimeout(() => {
+                        console.log("2 Seconds Waited");
+                        setCurrentState("answering");
+                        if (sessionId && questions[0]?.id) {
+                          startEEGRecording(sessionId, questions[0].id);
+                        }
+                        startTimer();
+                      }, 2000); // 2-second delay
+                    }, 100000); // 100-second delay
                   }}
                   className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center justify-center gap-2 mx-auto"
                 >
